@@ -1,0 +1,67 @@
+@page "/signup"
+@attribute [AllowAnonymous]
+@inject RealEstateApiClient Api
+@inject JwtAuthStateProvider Auth
+@inject NavigationManager Navigation
+
+<PageTitle>Sign up</PageTitle>
+
+<h1>Sign up</h1>
+<p class="text-muted">New accounts start as users. An administrator can grant admin access.</p>
+
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+<EditForm Model="model" OnValidSubmit="RegisterAsync" class="card p-3" style="max-width: 480px; width: 100%;">
+    <DataAnnotationsValidator />
+    <div class="mb-3">
+        <label class="form-label">Full name</label>
+        <InputText class="form-control" @bind-Value="model.FullName" />
+        <ValidationMessage For="() => model.FullName" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Username</label>
+        <InputText class="form-control" @bind-Value="model.Username" />
+        <ValidationMessage For="() => model.Username" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Email</label>
+        <InputText class="form-control" @bind-Value="model.Email" />
+        <ValidationMessage For="() => model.Email" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Password</label>
+        <InputText type="password" class="form-control" @bind-Value="model.Password" />
+        <ValidationMessage For="() => model.Password" />
+        <div class="form-text">At least 8 characters, with uppercase, lowercase, and a number.</div>
+    </div>
+    <button class="btn btn-primary" type="submit">Create account</button>
+    <a class="btn btn-link" href="login">Sign in</a>
+</EditForm>
+
+@code {
+    private readonly RegisterModel model = new();
+    private string? error;
+
+    private async Task RegisterAsync()
+    {
+        try
+        {
+            var response = await Api.RegisterAsync(model);
+            if (response is null)
+            {
+                error = "Sign up failed.";
+                return;
+            }
+
+            await Auth.SignInAsync(response);
+            Navigation.NavigateTo("/layouts");
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

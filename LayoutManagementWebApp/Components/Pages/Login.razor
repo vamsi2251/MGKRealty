@@ -1,0 +1,66 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@inject RealEstateApiClient Api
+@inject JwtAuthStateProvider Auth
+@inject NavigationManager Navigation
+
+<PageTitle>Sign in</PageTitle>
+
+<h1>Sign in</h1>
+<p class="text-muted">Use your username and password.</p>
+
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+<EditForm Model="model" OnValidSubmit="SignInAsync" class="card p-3" style="max-width: 480px; width: 100%;">
+    <DataAnnotationsValidator />
+    <div class="mb-3">
+        <label class="form-label">Username</label>
+        <InputText class="form-control" @bind-Value="model.Username" />
+        <ValidationMessage For="() => model.Username" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Password</label>
+        <InputText type="password" class="form-control" @bind-Value="model.Password" />
+        <ValidationMessage For="() => model.Password" />
+    </div>
+    <button class="btn btn-primary" type="submit">Sign in</button>
+    <a class="btn btn-link" href="signup">Create an account</a>
+</EditForm>
+
+@code {
+    private readonly LoginModel model = new();
+    private string? error;
+
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    private async Task SignInAsync()
+    {
+        try
+        {
+            var response = await Api.LoginAsync(model);
+            if (response is null)
+            {
+                error = "Sign in failed.";
+                return;
+            }
+
+            await Auth.SignInAsync(response);
+            var admin = response.Roles.Any(role => role.Equals("Admin", StringComparison.OrdinalIgnoreCase) || role.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase));
+            var target = string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : ReturnUrl;
+            if (!admin && (target is "/inquiries" || target.StartsWith("/admin", StringComparison.OrdinalIgnoreCase)))
+            {
+                target = "/";
+            }
+
+            Navigation.NavigateTo(target);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

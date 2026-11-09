@@ -1,0 +1,137 @@
+@page "/agents"
+@attribute [Authorize]
+@inject RealEstateApiClient Api
+
+<PageTitle>Agents</PageTitle>
+
+<h1>Agents</h1>
+
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+<button class="btn btn-primary mb-3" @onclick="StartNew">New agent</button>
+
+@if (editing is not null)
+{
+    <EditForm Model="editing" OnValidSubmit="SaveAsync" class="card p-3 mb-4">
+        <DataAnnotationsValidator />
+        <h2>@(editing.Id == 0 ? "New agent" : "Edit agent")</h2>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Name</label>
+                <InputText class="form-control" @bind-Value="editing.Name" />
+                <ValidationMessage For="() => editing.Name" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Email (optional)</label>
+                <InputText class="form-control" @bind-Value="editing.Email" />
+                <ValidationMessage For="() => editing.Email" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Phone</label>
+                <InputText class="form-control" @bind-Value="editing.Phone" />
+                <ValidationMessage For="() => editing.Phone" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">License</label>
+                <InputText class="form-control" @bind-Value="editing.LicenseNumber" />
+                <ValidationMessage For="() => editing.LicenseNumber" />
+            </div>
+        </div>
+        <div class="mt-3 d-flex gap-2">
+            <button class="btn btn-primary" type="submit">Save</button>
+            <button class="btn btn-outline-secondary" type="button" @onclick="Cancel">Cancel</button>
+        </div>
+    </EditForm>
+}
+
+<div class="table-scroll">
+<table class="table table-hover">
+    <thead>
+        <tr><th>Name</th><th>Email</th><th>Phone</th><th>License</th><th></th></tr>
+    </thead>
+    <tbody>
+        @foreach (var agent in agents)
+        {
+            <tr>
+                <td>@agent.Name</td>
+                <td>@agent.Email</td>
+                <td>@agent.Phone</td>
+                <td>@agent.LicenseNumber</td>
+                <td class="text-nowrap">
+                    <button class="btn btn-sm btn-outline-primary" @onclick="() => Edit(agent)">Edit</button>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(agent)">Delete</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+</div>
+
+@code {
+    private List<AgentModel> agents = new();
+    private AgentModel? editing;
+    private string? error;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            agents = await Api.GetAgentsAsync() ?? new();
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private void StartNew() => editing = new AgentModel();
+
+    private void Edit(AgentModel agent) => editing = new AgentModel
+    {
+        Id = agent.Id,
+        Name = agent.Name,
+        Email = agent.Email,
+        Phone = agent.Phone,
+        LicenseNumber = agent.LicenseNumber
+    };
+
+    private void Cancel() => editing = null;
+
+    private async Task SaveAsync()
+    {
+        if (editing is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await Api.SaveAgentAsync(editing);
+            editing = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task DeleteAsync(AgentModel agent)
+    {
+        try
+        {
+            await Api.DeleteAgentAsync(agent.Id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

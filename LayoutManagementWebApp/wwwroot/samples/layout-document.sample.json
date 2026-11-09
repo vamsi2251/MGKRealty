@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "2.0",
+  "layoutId": null,
+  "name": "Example review draft",
+  "sourceImage": null,
+  "canvasWidth": 1000,
+  "canvasHeight": 700,
+  "coordinates": {
+    "system": "normalized-image",
+    "origin": "top-left",
+    "xAxis": "right",
+    "yAxis": "down",
+    "unit": "fraction",
+    "dimensionUnit": null,
+    "areaUnit": null
+  },
+  "orientation": null,
+  "boundary": null,
+  "plots": [
+    {
+      "id": "example-plot-1",
+      "plotNumber": null,
+      "vertices": [
+        { "x": 0.1, "y": 0.1 },
+        { "x": 0.3, "y": 0.1 },
+        { "x": 0.3, "y": 0.3 },
+        { "x": 0.1, "y": 0.3 }
+      ],
+      "area": null,
+      "length": null,
+      "breadth": null,
+      "facing": null,
+      "status": "unknown",
+      "confidence": null,
+      "warnings": ["Example only. Plot number and area were not read from an image."]
+    }
+  ],
+  "roads": [],
+  "annotations": [],
+  "extraction": {
+    "provider": "none",
+    "status": "needs-review",
+    "confidence": null,
+    "warnings": ["This file shows the schema. It is not an extraction result."]
+  }
+}

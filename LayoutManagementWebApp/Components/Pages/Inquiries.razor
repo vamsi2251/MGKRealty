@@ -1,0 +1,157 @@
+@page "/inquiries"
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+@inject RealEstateApiClient Api
+
+<PageTitle>Inquiries</PageTitle>
+
+<h1>Inquiries</h1>
+
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+<button class="btn btn-primary mb-3" @onclick="StartNew">New inquiry</button>
+
+@if (editing is not null)
+{
+    <EditForm Model="editing" OnValidSubmit="SaveAsync" class="card p-3 mb-4">
+        <DataAnnotationsValidator />
+        <h2>@(editing.Id == 0 ? "New inquiry" : "Edit inquiry")</h2>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Listing</label>
+                <InputSelect class="form-select" @bind-Value="editing.PropertyId">
+                    <option value="0">Select a listing</option>
+                    @foreach (var property in properties)
+                    {
+                        <option value="@property.Id">@property.Title</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Client</label>
+                <InputSelect class="form-select" @bind-Value="editing.ClientId">
+                    <option value="0">Select a client</option>
+                    @foreach (var client in clients)
+                    {
+                        <option value="@client.Id">@client.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Status</label>
+                <InputSelect class="form-select" @bind-Value="editing.Status">
+                    @foreach (var value in Enum.GetValues<InquiryStatus>())
+                    {
+                        <option value="@value">@value</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-12">
+                <label class="form-label">Message</label>
+                <InputTextArea class="form-control" @bind-Value="editing.Message" />
+                <ValidationMessage For="() => editing.Message" />
+            </div>
+        </div>
+        <div class="mt-3 d-flex gap-2">
+            <button class="btn btn-primary" type="submit">Save</button>
+            <button class="btn btn-outline-secondary" type="button" @onclick="Cancel">Cancel</button>
+        </div>
+    </EditForm>
+}
+
+<div class="table-scroll">
+<table class="table table-hover">
+    <thead>
+        <tr><th>When</th><th>Listing</th><th>Client</th><th>Status</th><th>Message</th><th></th></tr>
+    </thead>
+    <tbody>
+        @foreach (var inquiry in inquiries)
+        {
+            <tr>
+                <td>@inquiry.CreatedOn.ToLocalTime().ToString("MMM d, yyyy")</td>
+                <td>@inquiry.PropertyTitle</td>
+                <td>@inquiry.ClientName</td>
+                <td>@inquiry.Status</td>
+                <td>@inquiry.Message</td>
+                <td class="text-nowrap">
+                    <button class="btn btn-sm btn-outline-primary" @onclick="() => Edit(inquiry)">Edit</button>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(inquiry)">Delete</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+</div>
+
+@code {
+    private List<InquiryModel> inquiries = new();
+    private List<PropertyModel> properties = new();
+    private List<ClientModel> clients = new();
+    private InquiryModel? editing;
+    private string? error;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            inquiries = await Api.GetInquiriesAsync() ?? new();
+            properties = await Api.GetPropertiesAsync() ?? new();
+            clients = await Api.GetClientsAsync() ?? new();
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private void StartNew() => editing = new InquiryModel();
+
+    private void Edit(InquiryModel inquiry) => editing = new InquiryModel
+    {
+        Id = inquiry.Id,
+        PropertyId = inquiry.PropertyId,
+        ClientId = inquiry.ClientId,
+        Message = inquiry.Message,
+        Status = inquiry.Status
+    };
+
+    private void Cancel() => editing = null;
+
+    private async Task SaveAsync()
+    {
+        if (editing is null || editing.PropertyId == 0 || editing.ClientId == 0)
+        {
+            error = "Select a listing and a client before saving the inquiry.";
+            return;
+        }
+
+        try
+        {
+            await Api.SaveInquiryAsync(editing);
+            editing = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task DeleteAsync(InquiryModel inquiry)
+    {
+        try
+        {
+            await Api.DeleteInquiryAsync(inquiry.Id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

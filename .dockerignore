@@ -1,0 +1,8 @@
+**/.vs
+**/bin
+**/obj
+**/*.db
+**/*.user
+.git
+.env
+agent-transcripts

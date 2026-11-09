@@ -1,0 +1,225 @@
+@page "/layouts"
+@attribute [Authorize]
+@inject RealEstateApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Plot sketches</PageTitle>
+
+<h1>Plot sketches</h1>
+<p class="text-muted">Choose ChatGPT extraction, a plot count with an image, or a layout document JSON. You only see the sketches you uploaded.</p>
+
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+<div class="card p-3 mb-4">
+    <h2>Upload a layout</h2>
+    <p>Nothing is sent until you click Upload. ChatGPT extraction reads a JPG or PNG. Manual entry stores that image and one numbered plot for the count you type; enter each area later on the sketch. Layout document reads a JSON file and does not use an image.</p>
+    <label class="form-label" for="layout-name">Layout name</label>
+    <input id="layout-name" class="form-control mb-3" maxlength="120" @bind="layoutName" placeholder="Green Valley layout" />
+    <fieldset class="mb-3">
+        <legend class="form-label">How to fill the plots</legend>
+        <div class="form-check">
+            <input class="form-check-input" type="radio" name="upload-mode" id="mode-extract" checked="@(mode == "extract")" @onchange='() => SelectMode("extract")' />
+            <label class="form-check-label" for="mode-extract">ChatGPT extraction</label>
+        </div>
+        <div class="form-check">
+            <input class="form-check-input" type="radio" name="upload-mode" id="mode-manual" checked="@(mode == "manual")" @onchange='() => SelectMode("manual")' />
+            <label class="form-check-label" for="mode-manual">Manual</label>
+        </div>
+        <div class="form-check">
+            <input class="form-check-input" type="radio" name="upload-mode" id="mode-json" checked="@(mode == "json")" @onchange='() => SelectMode("json")' />
+            <label class="form-check-label" for="mode-json">Layout document</label>
+        </div>
+    </fieldset>
+    @if (mode == "manual")
+    {
+        <label class="form-label" for="plot-count">Plot count</label>
+        <input id="plot-count" class="form-control mb-3" type="number" min="1" max="300" @bind="plotCount" @bind:after="RebuildRows" />
+        <div class="table-scroll mb-3">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Plot</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in rows)
+                    {
+                        <tr>
+                            <td>@row.PlotNumber</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    <p><a href="samples/layout-document.sample.json" download>Download a sample layout document</a></p>
+    <InputFile @key="mode" OnChange="SelectFileAsync" accept="@FileAccept" />
+    @if (!string.IsNullOrWhiteSpace(selectedName))
+    {
+        <p class="mt-2 mb-3">Selected: @selectedName</p>
+    }
+    <button type="button" class="btn btn-primary mt-3" disabled="@(uploading || selectedBytes is null)" @onclick="UploadAsync">Upload</button>
+</div>
+
+@if (layouts.Count == 0)
+{
+    <p>No sketches uploaded yet.</p>
+}
+else
+{
+    <div class="table-scroll">
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Layout</th>
+                <th>Plots</th>
+                <th>Total area</th>
+                <th>Available</th>
+                <th>Blocked</th>
+                <th>Advance</th>
+                <th>Uploaded</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var plan in layouts)
+            {
+                <tr>
+                    <td>
+                        <a href="@($"layouts/{plan.Id}")">@plan.Name</a>
+                        @if (plan.CompletedOn is not null)
+                        {
+                            <span class="badge text-bg-success ms-2">Completed</span>
+                        }
+                    </td>
+                    <td>@plan.PlotCount</td>
+                    <td>@plan.TotalArea.ToString("0.##") @plan.Unit</td>
+                    <td>@plan.AvailableCount</td>
+                    <td>@plan.BlockedCount</td>
+                    <td>@Money(plan.AdvanceTotal)</td>
+                    <td>@plan.UploadedBy, @plan.UploadedOn.ToLocalTime().ToString("MMM d, yyyy")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    </div>
+}
+
+@code {
+    private List<LayoutSummaryModel> layouts = new();
+    private readonly List<ManualPlotInputModel> rows = [];
+    private string layoutName = "";
+    private string? error;
+    private string mode = "extract";
+    private int plotCount = 1;
+    private bool uploading;
+    private byte[]? selectedBytes;
+    private string selectedName = "";
+    private string FileAccept => mode == "json"
+        ? ".json,application/json"
+        : ".png,.jpg,.jpeg,image/png,image/jpeg";
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            layouts = await Api.GetLayoutsAsync() ?? new();
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private void SelectMode(string next)
+    {
+        mode = next;
+        selectedBytes = null;
+        selectedName = "";
+        if (mode == "manual")
+        {
+            RebuildRows();
+        }
+    }
+
+    private void RebuildRows()
+    {
+        plotCount = Math.Clamp(plotCount, 1, 300);
+        rows.Clear();
+        for (var number = 1; number <= plotCount; number++)
+        {
+            rows.Add(new ManualPlotInputModel { PlotNumber = number.ToString() });
+        }
+    }
+
+    private async Task SelectFileAsync(InputFileChangeEventArgs args)
+    {
+        try
+        {
+            await using var stream = args.File.OpenReadStream(8 * 1024 * 1024);
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            selectedBytes = buffer.ToArray();
+            selectedName = args.File.Name;
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            selectedBytes = null;
+            selectedName = "";
+            error = ex.Message;
+        }
+    }
+
+    private async Task UploadAsync()
+    {
+        if (selectedBytes is null)
+        {
+            error = mode == "json" ? "Choose a layout document JSON file." : "Choose a sketch image first.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(layoutName))
+        {
+            error = "Enter a layout name before uploading.";
+            return;
+        }
+
+        if (mode == "manual")
+        {
+            RebuildRows();
+        }
+
+        uploading = true;
+        try
+        {
+            using var buffer = new MemoryStream(selectedBytes);
+            var created = await Api.ImportSketchAsync(
+                buffer,
+                selectedName,
+                layoutName.Trim(),
+                mode,
+                mode == "manual" ? rows : null);
+            if (created is not null)
+            {
+                Navigation.NavigateTo($"/layouts/{created.Id}");
+            }
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            uploading = false;
+        }
+    }
+
+    private static string Money(decimal value) =>
+        value.ToString("C0", System.Globalization.CultureInfo.GetCultureInfo("en-IN"));
+}

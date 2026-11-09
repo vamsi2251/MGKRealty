@@ -1,0 +1,299 @@
+@page "/admin/users"
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+@inject RealEstateApiClient Api
+@inject JwtAuthStateProvider Auth
+@inject NavigationManager Navigation
+
+<PageTitle>Users</PageTitle>
+
+<h1>Users</h1>
+<p class="text-muted">Create accounts, choose which sketches each person can open, and set that access to read only or editable. The built-in admin account stays an administrator and cannot be restricted.</p>
+
+<div class="card p-3 mb-4">
+    <h2>New user</h2>
+    <div class="row g-2">
+        <div class="col-md-3">
+            <label class="form-label">Name</label>
+            <input class="form-control" @bind="newName" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Username</label>
+            <input class="form-control" @bind="newUsername" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Email</label>
+            <input class="form-control" @bind="newEmail" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Password</label>
+            <input class="form-control" type="password" @bind="newPassword" />
+        </div>
+    </div>
+    <h3 class="h6 mt-3">Sketches</h3>
+    @foreach (var sketch in catalog)
+    {
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+            <input type="checkbox" checked="@newSketchIds.Contains(sketch.Id)" @onchange="args => ToggleNewSketch(sketch.Id, args)" />
+            <span>@sketch.Name</span>
+            <select class="form-select" style="max-width: 10rem;" value="@LevelFor(newLevels, sketch.Id)" @onchange="args => SetLevel(newLevels, sketch.Id, args)">
+                <option value="ReadOnly">Read only</option>
+                <option value="Editable">Editable</option>
+            </select>
+        </div>
+    }
+    <button class="btn btn-primary mt-2" type="button" @onclick="CreateAsync">Create user</button>
+</div>
+
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert alert-success">@message</div>
+}
+
+<div class="table-scroll">
+<table class="table">
+    <thead>
+        <tr><th>Name</th><th>Username</th><th>Email</th><th>Access</th><th>Sign-in</th><th>New password</th><th></th></tr>
+    </thead>
+    <tbody>
+        @foreach (var user in users)
+        {
+            <tr>
+                <td>@user.FullName</td>
+                <td><input class="form-control" @bind="user.Username" /></td>
+                <td>@user.Email</td>
+                <td>
+                    <select class="form-select" @bind="user.Role" disabled="@user.IsBuiltInAdmin">
+                        <option value="User">User</option>
+                        <option value="Admin">Admin</option>
+                    </select>
+                </td>
+                <td>
+                    @if (user.LoginRestricted)
+                    {
+                        <span class="badge text-bg-danger">Restricted</span>
+                    }
+                    else
+                    {
+                        <span class="badge text-bg-success">Allowed</span>
+                    }
+                </td>
+                <td><input class="form-control" type="password" placeholder="Leave blank to keep" @bind="user.NewPassword" /></td>
+                <td class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenSketchesAsync(user)">Sketches</button>
+                    <button class="btn btn-sm btn-primary" @onclick="() => SaveCredentialsAsync(user)">Save sign-in</button>
+                    <button class="btn btn-sm btn-primary" @onclick="() => SaveAsync(user)" disabled="@user.IsBuiltInAdmin">Save</button>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => RestrictAsync(user, false)" disabled="@user.IsBuiltInAdmin || user.LoginRestricted">Restrict login</button>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => RestrictAsync(user, true)" disabled="@(!user.LoginRestricted)">Allow login</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+</div>
+
+@if (selectedUser is not null)
+{
+    <div class="card p-3 mb-4">
+        <h2>Sketches for @selectedUser.FullName</h2>
+        @foreach (var sketch in catalog)
+        {
+            <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                <input type="checkbox" checked="@editSketchIds.Contains(sketch.Id)" @onchange="args => ToggleEditSketch(sketch.Id, args)" />
+                <span>@sketch.Name</span>
+                <select class="form-select" style="max-width: 10rem;" value="@LevelFor(editLevels, sketch.Id)" @onchange="args => SetLevel(editLevels, sketch.Id, args)">
+                    <option value="ReadOnly">Read only</option>
+                    <option value="Editable">Editable</option>
+                </select>
+            </div>
+        }
+        <button class="btn btn-primary" type="button" @onclick="SaveSketchesAsync">Save sketch access</button>
+    </div>
+}
+
+@code {
+    private List<UserModel> users = new();
+    private List<LayoutCatalogItemModel> catalog = new();
+    private UserModel? selectedUser;
+    private string? error;
+    private string? message;
+    private string newName = "";
+    private string newUsername = "";
+    private string newEmail = "";
+    private string newPassword = "";
+    private readonly HashSet<int> newSketchIds = new();
+    private readonly Dictionary<int, string> newLevels = new();
+    private readonly HashSet<int> editSketchIds = new();
+    private readonly Dictionary<int, string> editLevels = new();
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            users = await Api.GetUsersAsync() ?? new();
+            catalog = await Api.GetLayoutCatalogAsync() ?? new();
+            foreach (var user in users)
+            {
+                user.Role = user.Roles.Contains("Admin") ? "Admin" : "User";
+                user.OriginalUsername = user.Username;
+            }
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task RestrictAsync(UserModel user, bool allowed)
+    {
+        try
+        {
+            await Api.SetLoginAccessAsync(user.Id, allowed);
+            message = allowed ? $"{user.Username} can sign in." : $"{user.Username} cannot sign in.";
+            error = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private static string LevelFor(Dictionary<int, string> levels, int id) =>
+        levels.TryGetValue(id, out var level) ? level : "ReadOnly";
+
+    private static void SetLevel(Dictionary<int, string> levels, int id, ChangeEventArgs args) =>
+        levels[id] = string.IsNullOrWhiteSpace(args.Value?.ToString()) ? "ReadOnly" : args.Value!.ToString()!;
+
+    private void ToggleNewSketch(int id, ChangeEventArgs args)
+    {
+        if (args.Value is bool selected && selected)
+        {
+            newSketchIds.Add(id);
+        }
+        else
+        {
+            newSketchIds.Remove(id);
+        }
+    }
+
+    private void ToggleEditSketch(int id, ChangeEventArgs args)
+    {
+        if (args.Value is bool selected && selected)
+        {
+            editSketchIds.Add(id);
+        }
+        else
+        {
+            editSketchIds.Remove(id);
+        }
+    }
+
+    private List<UserSketchGrantModel> SelectedSketches(HashSet<int> ids, Dictionary<int, string> levels) =>
+        ids.Select(id => new UserSketchGrantModel { LayoutId = id, Level = LevelFor(levels, id) }).ToList();
+
+    private async Task CreateAsync()
+    {
+        try
+        {
+            await Api.CreateUserAsync(newName, newUsername, newEmail, newPassword, SelectedSketches(newSketchIds, newLevels));
+            message = $"{newUsername} can sign in.";
+            newName = newUsername = newEmail = newPassword = "";
+            newSketchIds.Clear();
+            error = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task OpenSketchesAsync(UserModel user)
+    {
+        try
+        {
+            selectedUser = user;
+            editSketchIds.Clear();
+            editLevels.Clear();
+            var grants = await Api.GetUserSketchesAsync(user.Id) ?? new();
+            foreach (var grant in grants)
+            {
+                editSketchIds.Add(grant.LayoutId);
+                editLevels[grant.LayoutId] = grant.Level;
+            }
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task SaveSketchesAsync()
+    {
+        if (selectedUser is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await Api.SaveUserSketchesAsync(selectedUser.Id, SelectedSketches(editSketchIds, editLevels));
+            message = $"Sketch access saved for {selectedUser.Username}.";
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task SaveCredentialsAsync(UserModel user)
+    {
+        var state = await Auth.GetAuthenticationStateAsync();
+        var changingCurrentAccount = string.Equals(state.User.Identity?.Name, user.OriginalUsername, StringComparison.OrdinalIgnoreCase);
+        try
+        {
+            await Api.SetCredentialsAsync(user.Id, user.Username, string.IsNullOrWhiteSpace(user.NewPassword) ? null : user.NewPassword);
+            user.NewPassword = "";
+            if (changingCurrentAccount)
+            {
+                await Auth.SignOutAsync();
+                Navigation.NavigateTo("/login", forceLoad: true);
+                return;
+            }
+
+            message = $"Sign-in updated for {user.Username}.";
+            error = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task SaveAsync(UserModel user)
+    {
+        try
+        {
+            await Api.SetRoleAsync(user.Id, user.Role);
+            message = $"{user.Username} is now {user.Role}.";
+            error = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

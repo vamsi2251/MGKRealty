@@ -1,0 +1,114 @@
+﻿@page "/"
+@attribute [Authorize]
+@inject RealEstateApiClient Api
+
+<PageTitle>Dashboard</PageTitle>
+
+<h1>Sketches</h1>
+<p class="text-muted">Layout sketches you have uploaded.</p>
+
+@if (reminders.Count > 0)
+{
+    <h2>Registration reminders</h2>
+    <div class="table-scroll mb-4">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Sketch</th>
+                <th>Plot</th>
+                <th>Advance</th>
+                <th>Advance date</th>
+                <th>Registration</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var reminder in reminders)
+            {
+                <tr>
+                    <td><a href="@($"layouts/{reminder.LayoutPlanId}")">@reminder.SketchName</a></td>
+                    <td>@reminder.PlotNumber</td>
+                    <td>@reminder.AdvanceReceived.ToString("C0", System.Globalization.CultureInfo.GetCultureInfo("en-IN"))</td>
+                    <td>@(reminder.AdvanceReceivedOn?.ToString("MMM d, yyyy"))</td>
+                    <td>@reminder.RegistrationOn.ToString("MMM d, yyyy")</td>
+                    <td>
+                        @if (!reminder.IsRead)
+                        {
+                            <button class="btn btn-sm btn-outline-primary" type="button" @onclick="() => MarkReadAsync(reminder)">Mark read</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+else if (layouts is null)
+{
+    <p>Loading sketches...</p>
+}
+else if (layouts.Count == 0)
+{
+    <p>No sketches yet. <a href="layouts">Upload a layout image</a>.</p>
+}
+else
+{
+    <div class="table-scroll">
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Sketch</th>
+                <th>Plots</th>
+                <th>Total area</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var plan in layouts)
+            {
+                <tr>
+                    <td><a href="@($"layouts/{plan.Id}")">@plan.Name</a></td>
+                    <td>@plan.PlotCount</td>
+                    <td>@plan.TotalArea.ToString("0.##") @plan.Unit</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    </div>
+}
+
+@code {
+    private List<LayoutSummaryModel>? layouts;
+    private List<RegistrationReminderModel> reminders = new();
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            layouts = await Api.GetLayoutsAsync() ?? new();
+            reminders = await Api.GetNotificationsAsync() ?? new();
+        }
+        catch (Exception ex)
+        {
+            error = $"The real estate API is unavailable. Start LayoutManagementAPI, then reload. {ex.Message}";
+        }
+    }
+
+    private async Task MarkReadAsync(RegistrationReminderModel reminder)
+    {
+        try
+        {
+            await Api.MarkNotificationReadAsync(reminder.Id);
+            reminder.IsRead = true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

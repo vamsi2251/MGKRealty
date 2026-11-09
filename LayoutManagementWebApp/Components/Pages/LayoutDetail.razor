@@ -1,0 +1,862 @@
+@page "/layouts/{Id:int}"
+@attribute [Authorize]
+@inject RealEstateApiClient Api
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthState
+
+<PageTitle>@(plan?.Name ?? "Layout")</PageTitle>
+
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+@if (plan is null)
+{
+    <p>Loading layout...</p>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-start gap-3 stack-mobile">
+        <div>
+            <label class="form-label" for="saved-layout-name">Layout name</label>
+            <input id="saved-layout-name" class="form-control mb-2" maxlength="120" @bind="layoutName" disabled="@(!canEdit)" />
+            <p class="text-muted">@plan.PlotCount plots · @plan.TotalArea.ToString("0.##") @plan.Unit · @plan.FileName</p>
+            @if (!string.IsNullOrWhiteSpace(plan.Notes))
+            {
+                <p>@plan.Notes</p>
+            }
+        </div>
+        @if (canManage)
+        {
+            <div class="d-flex flex-column gap-2">
+                @if (plan.CompletedOn is null && plan.Plots.Count > 0 && plan.Plots.All(plot => plot.Status == PlotStatus.Sold))
+                {
+                    <button class="btn btn-success" type="button" @onclick="CompleteAsync">Complete layout</button>
+                }
+                else if (plan.CompletedOn is null)
+                {
+                    <p class="text-muted mb-0">Complete this layout after every plot is sold.</p>
+                }
+                else
+                {
+                    <p class="text-muted mb-0">Completed @plan.CompletedOn.Value.ToLocalTime().ToString("MMM d, yyyy")</p>
+                }
+                <button class="btn btn-outline-danger" type="button" @onclick="DeleteAsync">Delete layout</button>
+            </div>
+        }
+    </div>
+    @if (canShare)
+    {
+        <div class="card p-3 my-3">
+            <h2>Partners</h2>
+            <p class="text-muted">Give another user this sketch. The same person can be added to more than one sketch.</p>
+            <div class="row g-2 align-items-end mb-3">
+                <div class="col-md-5">
+                    <label class="form-label">User</label>
+                    <select class="form-select" @bind="partnerUserId">
+                        <option value="">Choose a user</option>
+                        @foreach (var user in partnerChoices)
+                        {
+                            <option value="@user.Id">@user.FullName (@user.Username)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Access</label>
+                    <select class="form-select" @bind="partnerLevel">
+                        <option value="ReadOnly">Read only</option>
+                        <option value="Editable">Editable</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-primary" type="button" @onclick="AddPartnerAsync">Add partner</button>
+                </div>
+            </div>
+            @foreach (var partner in partners)
+            {
+                <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                    <span>@partner.FullName (@partner.Username)</span>
+                    <span class="badge text-bg-secondary">@(partner.Level == "Editable" ? "Editable" : "Read only")</span>
+                    <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="() => RemovePartnerAsync(partner.UserId)">Remove</button>
+                </div>
+            }
+        </div>
+    }
+
+    <p class="text-muted">Review status: @(plan.Document?.Extraction.Status ?? "not extracted"). Provider: @(plan.Document?.Extraction.Provider ?? "none"). Extraction uses ChatGPT vision when an OpenAI API key is configured.</p>
+    @if (canEdit)
+    {
+        <button class="btn btn-outline-primary mb-3" type="button" @onclick="ExtractAsync">Extract with ChatGPT</button>
+    }
+    <LayoutCanvas Document="plan.Document" ImageUrl="@sketchUrl" CanEdit="canEdit" DocumentChanged="OnDocumentChanged" SaveRequested="SaveDocumentAsync" />
+    @if (plan.Document?.Extraction.Warnings.Count > 0)
+    {
+        <details class="mt-3">
+            <summary>@plan.Document.Extraction.Warnings.Distinct().Count() review notes</summary>
+            @foreach (var warning in plan.Document.Extraction.Warnings.Distinct())
+            {
+                <div class="alert alert-warning py-2 mt-2">@warning</div>
+            }
+        </details>
+    }
+
+    <div class="d-flex align-items-center gap-2 mb-2">
+        <label class="form-label mb-0" for="status-filter">Status</label>
+        <select id="status-filter" class="form-select" style="max-width: 12rem;" @bind="statusFilter">
+            <option value="all">All</option>
+            <option value="@PlotStatus.Available">Available</option>
+            <option value="@PlotStatus.Blocked">Blocked</option>
+            <option value="@PlotStatus.Sold">Sold</option>
+        </select>
+        @if (canEdit)
+        {
+            <button class="btn btn-outline-primary" type="button" @onclick="AddRowAsync">Add row</button>
+        }
+    </div>
+    <div class="table-scroll">
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Plot</th>
+                <th>Area (cent)</th>
+                <th>Facing</th>
+                <th>Price</th>
+                <th>Agent</th>
+                <th>Client</th>
+                <th>Mobile</th>
+                <th>Advance</th>
+                <th>Advance date</th>
+                <th>Balance</th>
+                <th>Registration</th>
+                <th>Status</th>
+                <th>Comment</th>
+                <th>Survey</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var plot in FilteredPlots)
+            {
+                <tr>
+                    <td>@plot.PlotNumber</td>
+                    <td>@plot.Area.ToString("0.##")</td>
+                    <td>@plot.Facing</td>
+                    <td>@Money(plot.Price)</td>
+                    <td>@plot.AgentName</td>
+                    <td>@plot.ClientName</td>
+                    <td>@plot.ClientMobile</td>
+                    <td>@Money(plot.AdvanceReceived)</td>
+                    <td>@When(plot.AdvanceReceivedOn)</td>
+                    <td>@Money(plot.Balance)</td>
+                    <td>@When(plot.RegistrationOn)</td>
+                    <td>@plot.Status</td>
+                    <td class="plot-comment">@plot.Comment</td>
+                    <td>@(plot.HasSurvey ? plot.SurveyFileName : "")</td>
+                    <td>@if (canEdit) { <button class="btn btn-sm btn-outline-primary" @onclick="() => EditAsync(plot)">Manage</button> }</td>
+                </tr>
+            }
+        </tbody>
+        <tfoot>
+            <tr>
+                <th colspan="7">Totals</th>
+                <th>@Money(AdvanceTotal)</th>
+                <th></th>
+                <th>@Money(PendingTotal)</th>
+                <th colspan="5"></th>
+            </tr>
+        </tfoot>
+    </table>
+    </div>
+    <p class="text-muted">Total advances received @Money(AdvanceTotal). Total pending from clients @Money(PendingTotal). Receivable @Money(ReceivableTotal). Spent on the land owner and development @Money(SpentTotal). Profit @Money(ProfitTotal).</p>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <div class="card p-3 h-100">
+                <h2>Land owner</h2>
+                <label class="form-label" for="owner-payable">Amount payable</label>
+                <input id="owner-payable" class="form-control mb-2" type="number" min="0" step="0.01" @bind="ownerPayable" disabled="@(!canEdit)" />
+                @if (canEdit)
+                {
+                    <button class="btn btn-outline-primary mb-3" type="button" @onclick="SaveOwnerAsync">Save payable amount</button>
+                }
+                <p>Paid @Money(plan.OwnerPaid). Remaining @Money(plan.OwnerRemaining).</p>
+                @if (canEdit)
+                {
+                <div class="row g-2 mb-3">
+                    <div class="col-md-5">
+                        <label class="form-label">Payment date</label>
+                        <InputDate class="form-control" @bind-Value="ownerPaidOn" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Amount</label>
+                        <input class="form-control" type="number" min="0.01" step="0.01" @bind="ownerPaymentAmount" />
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button class="btn btn-primary" type="button" @onclick="AddOwnerPaymentAsync">Add payment</button>
+                    </div>
+                </div>
+                }
+                @foreach (var payment in plan.OwnerPayments)
+                {
+                    <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                        <InputDate class="form-control" style="max-width: 11rem;" @bind-Value="payment.PaidOn" disabled="@(!canEdit)" />
+                        <input class="form-control" style="max-width: 9rem;" type="number" min="0.01" step="0.01" @bind="payment.Amount" disabled="@(!canEdit)" />
+                        @if (canEdit)
+                        {
+                            <button class="btn btn-outline-primary" type="button" @onclick="() => UpdateOwnerPaymentAsync(payment)">Update</button>
+                            <button class="btn btn-outline-secondary" type="button" @onclick="() => DeleteOwnerPaymentAsync(payment.Id)">Remove</button>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card p-3 h-100">
+                <h2>Development expenses</h2>
+                <label class="form-label">Surveyor amount</label>
+                <input class="form-control mb-2" type="number" min="0" step="0.01" @bind="surveyorAmount" disabled="@(!canEdit)" />
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <label class="form-label">Tippers</label>
+                        <input class="form-control" type="number" min="0" step="1" @bind="tipperCount" disabled="@(!canEdit)" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Cost each</label>
+                        <input class="form-control" type="number" min="0" step="0.01" @bind="tipperCost" disabled="@(!canEdit)" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Tipper total</label>
+                        <input class="form-control" readonly value="@Money(tipperCount * tipperCost)" />
+                    </div>
+                </div>
+                <label class="form-label mt-2">Miscellaneous</label>
+                <input class="form-control mb-2" type="number" min="0" step="0.01" @bind="miscellaneousAmount" disabled="@(!canEdit)" />
+                <p>Development total @Money(surveyorAmount + (tipperCount * tipperCost) + miscellaneousAmount).</p>
+                @if (canEdit)
+                {
+                    <button class="btn btn-primary" type="button" @onclick="SaveExpensesAsync">Save expenses</button>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (canEdit && editing is not null)
+    {
+        <EditForm Model="editing" OnValidSubmit="SaveAsync" class="card p-3">
+            <h2>Plot @editing.PlotNumber</h2>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Area (cent)</label>
+                    <InputNumber class="form-control" @bind-Value="editing.Area" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Price</label>
+                    <InputNumber class="form-control" @bind-Value="editing.Price" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Agent</label>
+                    <InputSelect class="form-select" @bind-Value="editing.AgentId">
+                        <option value="0">No agent</option>
+                        @foreach (var agent in agents)
+                        {
+                            <option value="@agent.Id">@agent.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Client</label>
+                    <InputSelect class="form-select" @bind-Value="editing.ClientId">
+                        <option value="0">No client</option>
+                        @foreach (var client in clients)
+                        {
+                            <option value="@client.Id">@client.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Mobile</label>
+                    <input class="form-control" value="@SelectedClientPhone" readonly />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Advance received</label>
+                    <InputNumber class="form-control" @bind-Value="editing.AdvanceReceived" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Advance received date</label>
+                    <InputDate class="form-control" @bind-Value="editing.AdvanceReceivedOn" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Registration date</label>
+                    <InputDate class="form-control" @bind-Value="editing.RegistrationOn" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <InputSelect class="form-select" @bind-Value="editing.Status">
+                        <option value="@PlotStatus.Available">Available</option>
+                        <option value="@PlotStatus.Blocked">Blocked</option>
+                        @if (canManage)
+                        {
+                            <option value="@PlotStatus.Sold">Sold</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Comment</label>
+                    <InputTextArea class="form-control" rows="3" maxlength="1000" @bind-Value="editing.Comment" />
+                    <div class="form-text">Add a note when this plot is split or needs an explanation.</div>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Survey sketch</label>
+                    <InputFile class="form-control" accept=".png,.jpg,.jpeg,image/png,image/jpeg" OnChange="SelectSurveyAsync" />
+                    <div class="form-text">JPG, JPEG, or PNG, up to 8 MB.</div>
+                    @if (!string.IsNullOrEmpty(surveyPreview))
+                    {
+                        <img class="survey-preview" src="@surveyPreview" alt="Survey sketch for plot @editing.PlotNumber" />
+                    }
+                    @if (editing.HasSurvey || surveyBytes is not null)
+                    {
+                        <button class="btn btn-sm btn-outline-danger mt-2" type="button" @onclick="ClearSurvey">Remove survey sketch</button>
+                    }
+                </div>
+            </div>
+            <div class="mt-3 d-flex gap-2">
+                <button class="btn btn-primary" type="submit">Save booking</button>
+                <button class="btn btn-outline-secondary" type="button" @onclick="Cancel">Cancel</button>
+            </div>
+        </EditForm>
+    }
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private LayoutDetailModel? plan;
+    private List<AgentModel> agents = new();
+    private List<ClientModel> clients = new();
+    private string layoutName = "";
+    private PlotModel? editing;
+    private string? sketchUrl;
+    private byte[]? surveyBytes;
+    private string? surveyName;
+    private string? surveyPreview;
+    private bool removeSurvey;
+    private string? error;
+    private bool canManage;
+    private bool canEdit;
+    private bool canShare;
+    private List<UserModel> partnerChoices = new();
+    private List<LayoutPartnerModel> partners = new();
+    private string partnerUserId = "";
+    private string partnerLevel = "ReadOnly";
+    private string? userName;
+    private string statusFilter = "all";
+    private decimal ownerPayable;
+    private DateTime ownerPaidOn = DateTime.Today;
+    private decimal ownerPaymentAmount;
+    private decimal surveyorAmount;
+    private int tipperCount;
+    private decimal tipperCost;
+    private decimal miscellaneousAmount;
+
+    private IEnumerable<PlotModel> FilteredPlots =>
+        plan?.Plots.Where(plot => statusFilter == "all" || plot.Status.ToString() == statusFilter) ?? [];
+
+    private decimal AdvanceTotal => plan?.Plots.Sum(plot => plot.AdvanceReceived) ?? 0;
+    private decimal PendingTotal => plan?.Plots.Sum(plot => plot.Price - plot.AdvanceReceived) ?? 0;
+    private decimal ReceivableTotal => AdvanceTotal + PendingTotal;
+    private decimal SpentTotal => (plan?.OwnerPaid ?? 0) + (plan?.DevelopmentTotal ?? 0);
+    private decimal ProfitTotal => ReceivableTotal - SpentTotal;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthState.GetAuthenticationStateAsync();
+        userName = state.User.Identity?.Name;
+    }
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            plan = await Api.GetLayoutAsync(Id);
+            layoutName = plan?.Name ?? "";
+            CopyFinance();
+            canManage = plan?.CanManage == true;
+            canEdit = plan?.CanEdit == true;
+            canShare = plan?.CanShare == true;
+            if (canShare)
+            {
+                partnerChoices = await Api.GetPartnerUsersAsync(Id) ?? new();
+                partners = await Api.GetPartnersAsync(Id) ?? new();
+            }
+            sketchUrl = null;
+            if (plan?.HasImage == true)
+            {
+                var image = await Api.GetSketchImageAsync(Id);
+                if (image is not null)
+                {
+                    sketchUrl = $"data:{image.Value.ContentType};base64,{Convert.ToBase64String(image.Value.Bytes)}";
+                }
+            }
+
+            agents = await Api.GetAgentsAsync() ?? new();
+            clients = await Api.GetClientsAsync() ?? new();
+            error = plan is null ? "Layout not found." : null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task EditAsync(PlotModel plot)
+    {
+        editing = new PlotModel
+        {
+            Id = plot.Id,
+            PlotNumber = plot.PlotNumber,
+            Area = plot.Area,
+            Price = plot.Price,
+            AgentId = plot.AgentId,
+            ClientId = plot.ClientId,
+            ClientName = plot.ClientName,
+            ClientMobile = plot.ClientMobile,
+            AdvanceReceived = plot.AdvanceReceived,
+            AdvanceReceivedOn = plot.AdvanceReceivedOn,
+            RegistrationOn = plot.RegistrationOn,
+            Status = plot.Status,
+            Comment = plot.Comment ?? "",
+            HasSurvey = plot.HasSurvey,
+            SurveyFileName = plot.SurveyFileName
+        };
+        surveyBytes = null;
+        surveyName = null;
+        surveyPreview = null;
+        removeSurvey = false;
+        if (!plot.HasSurvey)
+        {
+            return;
+        }
+
+        try
+        {
+            var image = await Api.GetPlotSurveyAsync(plot.Id);
+            if (image is not null)
+            {
+                surveyPreview = $"data:{image.Value.ContentType};base64,{Convert.ToBase64String(image.Value.Bytes)}";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task SelectSurveyAsync(InputFileChangeEventArgs args)
+    {
+        try
+        {
+            var file = args.File;
+            await using var stream = file.OpenReadStream(8_000_000);
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            surveyBytes = buffer.ToArray();
+            surveyName = file.Name;
+            removeSurvey = false;
+            if (editing is not null)
+            {
+                editing.HasSurvey = true;
+                editing.SurveyFileName = file.Name;
+            }
+
+            var contentType = file.Name.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ? "image/png" : "image/jpeg";
+            surveyPreview = $"data:{contentType};base64,{Convert.ToBase64String(surveyBytes)}";
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private void ClearSurvey()
+    {
+        surveyBytes = null;
+        surveyName = null;
+        surveyPreview = null;
+        removeSurvey = true;
+        if (editing is not null)
+        {
+            editing.HasSurvey = false;
+            editing.SurveyFileName = null;
+        }
+    }
+
+    private string SelectedClientPhone =>
+        clients.FirstOrDefault(client => client.Id == editing?.ClientId)?.Phone ?? "";
+
+    private void Cancel()
+    {
+        editing = null;
+        surveyBytes = null;
+        surveyName = null;
+        surveyPreview = null;
+        removeSurvey = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (editing is null)
+        {
+            return;
+        }
+
+        if (editing.AdvanceReceived > 0 && editing.Status == PlotStatus.Available)
+        {
+            editing.Status = PlotStatus.Blocked;
+        }
+
+        try
+        {
+            await Api.SaveBookingAsync(editing);
+            if (removeSurvey)
+            {
+                await Api.DeletePlotSurveyAsync(editing.Id);
+            }
+            else if (surveyBytes is not null && !string.IsNullOrWhiteSpace(surveyName))
+            {
+                using var stream = new MemoryStream(surveyBytes);
+                await Api.UploadPlotSurveyAsync(editing.Id, stream, surveyName);
+            }
+
+            editing = null;
+            surveyBytes = null;
+            surveyName = null;
+            surveyPreview = null;
+            removeSurvey = false;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private void OnDocumentChanged(LayoutDocumentModel document)
+    {
+        if (plan is not null)
+        {
+            plan.Document = document;
+        }
+    }
+
+    private async Task ExtractAsync()
+    {
+        try
+        {
+            var updated = await Api.ExtractLayoutAsync(Id);
+            if (updated is not null)
+            {
+                plan = updated;
+            }
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task SaveDocumentAsync()
+    {
+        if (plan?.Document is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(layoutName))
+        {
+            error = "Enter a layout name.";
+            return;
+        }
+
+        plan.Document.Name = layoutName.Trim();
+        try
+        {
+            var updated = await Api.SaveDocumentAsync(Id, plan.Document);
+            if (updated is not null)
+            {
+                plan = updated;
+                layoutName = updated.Name;
+            }
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task CompleteAsync()
+    {
+        try
+        {
+            var updated = await Api.CompleteLayoutAsync(Id);
+            if (updated is not null)
+            {
+                plan = updated;
+                layoutName = updated.Name;
+            }
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task AddPartnerAsync()
+    {
+        if (string.IsNullOrWhiteSpace(partnerUserId))
+        {
+            error = "Choose a user.";
+            return;
+        }
+
+        try
+        {
+            partners = await Api.AddPartnerAsync(Id, partnerUserId, partnerLevel) ?? partners;
+            partnerUserId = "";
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task RemovePartnerAsync(string userId)
+    {
+        try
+        {
+            partners = await Api.RemovePartnerAsync(Id, userId) ?? partners;
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        try
+        {
+            await Api.DeleteLayoutAsync(Id);
+            Navigation.NavigateTo("/layouts");
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private string ViewBox
+    {
+        get
+        {
+            var points = plan?.Plots.SelectMany(p => p.Vertices).ToList() ?? new();
+            if (points.Count == 0)
+            {
+                return "0 0 100 100";
+            }
+
+            var minX = points.Min(p => p.X);
+            var minY = points.Min(p => p.Y);
+            var maxX = points.Max(p => p.X);
+            var maxY = points.Max(p => p.Y);
+            var pad = 4;
+            return $"{minX - pad} {-(maxY + pad)} {maxX - minX + pad * 2} {maxY - minY + pad * 2}";
+        }
+    }
+
+    private MarkupString MapShapes
+    {
+        get
+        {
+            if (plan is null)
+            {
+                return new MarkupString(string.Empty);
+            }
+
+            var road = plan.Unit == "cent"
+                ? "<rect x=\"40\" y=\"-340\" width=\"30\" height=\"340\" class=\"plot-road\"></rect><text x=\"55\" y=\"-170\" class=\"road-label\">30' road</text>"
+                : "";
+            var shapes = string.Concat(plan.Plots.Select(plot =>
+            {
+                var center = Center(plot);
+                var number = System.Net.WebUtility.HtmlEncode(plot.PlotNumber);
+                var area = System.Net.WebUtility.HtmlEncode(plot.Area.ToString("0.##"));
+                return $"<polygon points=\"{Points(plot)}\" class=\"plot-shape {plot.Status.ToString().ToLowerInvariant()}\"></polygon><text x=\"{center.X}\" y=\"{center.Y - 3}\">{number}</text><text x=\"{center.X}\" y=\"{center.Y + 4}\" class=\"plot-area\">{area}</text>";
+            }));
+            return new MarkupString(road + shapes);
+        }
+    }
+
+    private static string Points(PlotModel plot) =>
+        string.Join(" ", plot.Vertices.Select(v => $"{v.X},{-v.Y}"));
+
+    private static SketchPointModel Center(PlotModel plot)
+    {
+        if (plot.Vertices.Count == 0)
+        {
+            return new SketchPointModel();
+        }
+
+        return new SketchPointModel
+        {
+            X = plot.Vertices.Average(v => v.X),
+            Y = -plot.Vertices.Average(v => v.Y)
+        };
+    }
+
+    private void CopyFinance()
+    {
+        if (plan is null)
+        {
+            return;
+        }
+
+        ownerPayable = plan.OwnerPayable;
+        surveyorAmount = plan.SurveyorAmount;
+        tipperCount = plan.TipperCount;
+        tipperCost = plan.TipperCost;
+        miscellaneousAmount = plan.MiscellaneousAmount;
+    }
+
+    private void ApplyFinance(LayoutDetailModel? updated)
+    {
+        if (plan is null || updated is null)
+        {
+            return;
+        }
+
+        plan.OwnerPayable = updated.OwnerPayable;
+        plan.OwnerPaid = updated.OwnerPaid;
+        plan.OwnerRemaining = updated.OwnerRemaining;
+        plan.OwnerPayments = updated.OwnerPayments;
+        plan.SurveyorAmount = updated.SurveyorAmount;
+        plan.TipperCount = updated.TipperCount;
+        plan.TipperCost = updated.TipperCost;
+        plan.TipperTotal = updated.TipperTotal;
+        plan.MiscellaneousAmount = updated.MiscellaneousAmount;
+        plan.DevelopmentTotal = updated.DevelopmentTotal;
+        CopyFinance();
+        error = null;
+    }
+
+    private async Task AddRowAsync()
+    {
+        try
+        {
+            var plot = await Api.AddPlotRowAsync(Id);
+            if (plan is not null && plot is not null)
+            {
+                plan.Plots.Add(plot);
+                plan.PlotCount = plan.Plots.Count;
+                plan.Document?.Plots.Add(new DocumentPlotModel
+                {
+                    Id = $"plot-{plot.PlotNumber}",
+                    PlotNumber = plot.PlotNumber,
+                    Status = "available",
+                    Area = new MeasuredValueModel { Value = null, Unit = "cent", Source = "manual" },
+                    Vertices =
+                    [
+                        new() { X = 0, Y = 0 },
+                        new() { X = 0.001, Y = 0 },
+                        new() { X = 0, Y = 0.001 }
+                    ]
+                });
+            }
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task SaveOwnerAsync()
+    {
+        try
+        {
+            ApplyFinance(await Api.SaveOwnerPayableAsync(Id, ownerPayable));
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task AddOwnerPaymentAsync()
+    {
+        try
+        {
+            ApplyFinance(await Api.AddOwnerPaymentAsync(Id, ownerPaidOn, ownerPaymentAmount));
+            ownerPaymentAmount = 0;
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task UpdateOwnerPaymentAsync(OwnerPaymentModel payment)
+    {
+        try
+        {
+            ApplyFinance(await Api.UpdateOwnerPaymentAsync(Id, payment));
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task DeleteOwnerPaymentAsync(int paymentId)
+    {
+        try
+        {
+            ApplyFinance(await Api.DeleteOwnerPaymentAsync(Id, paymentId));
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task SaveExpensesAsync()
+    {
+        try
+        {
+            ApplyFinance(await Api.SaveExpensesAsync(Id, surveyorAmount, tipperCount, tipperCost, miscellaneousAmount));
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private static string When(DateTime? value) => value is null ? "" : value.Value.ToString("MMM d, yyyy");
+
+    private static string Money(decimal value) =>
+        value.ToString("C0", System.Globalization.CultureInfo.GetCultureInfo("en-IN"));
+}

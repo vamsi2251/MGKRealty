@@ -1,0 +1,206 @@
+@if (Document is null || Document.CanvasWidth <= 0 || Document.CanvasHeight <= 0)
+{
+    <p>This layout has no canvas dimensions yet.</p>
+}
+else
+{
+    <div class="d-flex gap-2 mb-2 toolbar">
+        <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="ZoomOut">Zoom out</button>
+        <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="ZoomIn">Zoom in</button>
+        @if (CanEdit)
+        {
+            <button class="btn btn-sm btn-primary" type="button" @onclick="SaveAsync">Save layout</button>
+        }
+    </div>
+    <div class="layout-viewport"
+         @onpointerdown="StartPan"
+         @onpointermove="MovePan"
+         @onpointerup="EndPan">
+        <div class="layout-stage" style="@StageStyle">
+            @if (!string.IsNullOrEmpty(ImageUrl))
+            {
+                <img src="@ImageUrl" alt="Uploaded layout sketch" />
+            }
+            <svg viewBox="0 0 @Document.CanvasWidth @Document.CanvasHeight" preserveAspectRatio="xMidYMid meet">
+                @foreach (var road in Document.Roads)
+                {
+                    <polygon points="@Points(road.Vertices, Document.CanvasWidth, Document.CanvasHeight)" class="layout-road" />
+                }
+                @foreach (var plot in VisiblePlots)
+                {
+                    <polygon points="@Points(plot.Vertices, Document.CanvasWidth, Document.CanvasHeight)"
+                             class="layout-plot @plot.Status @(selected?.Id == plot.Id ? "selected" : "")"
+                             @onclick="() => Select(plot.Id)"
+                             @onclick:stopPropagation="true"
+                             @onpointerdown:stopPropagation="CanEdit" />
+                }
+                @((MarkupString)Labels)
+            </svg>
+        </div>
+    </div>
+
+    @if (CanEdit && selected is not null)
+    {
+        <div class="card p-3 mt-3">
+            <h2>Plot @(string.IsNullOrWhiteSpace(selected.PlotNumber) ? selected.Id : selected.PlotNumber)</h2>
+            <p class="text-muted">Status @selected.Status. Confidence @(selected.Confidence?.ToString("0.00") ?? "not set"). Source @(selected.Area?.Source ?? "none").</p>
+            @foreach (var warning in selected.Warnings)
+            {
+                <div class="alert alert-warning py-1">@warning</div>
+            }
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <label class="form-label">Plot number</label>
+                    <input class="form-control" @bind="selected.PlotNumber" @bind:event="oninput" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Area (cent)</label>
+                    <input class="form-control" type="number" step="0.01" value="@selected.Area?.Value" @onchange="SetArea" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" @bind="selected.Status">
+                        <option value="unknown">unknown</option>
+                        <option value="available">available</option>
+                        <option value="reserved">reserved</option>
+                        <option value="blocked">blocked</option>
+                        <option value="sold">sold</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public LayoutDocumentModel? Document { get; set; }
+    [Parameter] public string? ImageUrl { get; set; }
+    [Parameter] public EventCallback<LayoutDocumentModel> DocumentChanged { get; set; }
+    [Parameter] public EventCallback SaveRequested { get; set; }
+    [Parameter] public bool CanEdit { get; set; } = true;
+
+    private DocumentPlotModel? selected;
+    private double zoom = 1;
+    private double panX;
+    private double panY;
+    private bool panning;
+    private double lastX;
+    private double lastY;
+
+    private IEnumerable<DocumentPlotModel> VisiblePlots =>
+        Document?.Plots.Where(plot => !string.Equals(plot.Status, "unknown", StringComparison.OrdinalIgnoreCase))
+        ?? [];
+
+    private string StageStyle =>
+        $"transform: translate({panX}px, {panY}px) scale({zoom.ToString(System.Globalization.CultureInfo.InvariantCulture)}); aspect-ratio: {Document?.CanvasWidth ?? 1} / {Document?.CanvasHeight ?? 1};";
+
+    private string Labels
+    {
+        get
+        {
+            if (Document is null)
+            {
+                return "";
+            }
+
+            var font = Math.Max(22, Document.CanvasWidth / 38d);
+            var areaFont = font * 0.55;
+            return string.Concat(VisiblePlots.Select(plot =>
+            {
+                var center = Center(plot.Vertices, Document.CanvasWidth, Document.CanvasHeight);
+                var label = System.Net.WebUtility.HtmlEncode(plot.PlotNumber ?? "");
+                var area = plot.Area?.Value is null ? "" : System.Net.WebUtility.HtmlEncode($"{plot.Area.Value.Value.ToString("0.##")} {plot.Area.Unit}");
+                var x = center.X.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                var numberY = (center.Y - (font * 0.15)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                var areaY = (center.Y + (font * 0.85)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                var numberSize = font.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+                var areaSize = areaFont.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+                return $"<text class=\"plot-number\" x=\"{x}\" y=\"{numberY}\" font-size=\"{numberSize}\">{label}</text><text class=\"plot-area\" x=\"{x}\" y=\"{areaY}\" font-size=\"{areaSize}\">{area}</text>";
+            }));
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (selected is not null && (Document?.Plots.Any(plot => plot.Id == selected.Id && !string.Equals(plot.Status, "unknown", StringComparison.OrdinalIgnoreCase)) != true))
+        {
+            selected = null;
+        }
+    }
+
+    private void ZoomIn() => zoom = Math.Min(4, zoom + 0.25);
+    private void ZoomOut() => zoom = Math.Max(0.5, zoom - 0.25);
+
+    private void StartPan(PointerEventArgs args)
+    {
+        panning = true;
+        lastX = args.ClientX;
+        lastY = args.ClientY;
+    }
+
+    private void MovePan(PointerEventArgs args)
+    {
+        if (!panning)
+        {
+            return;
+        }
+
+        panX += args.ClientX - lastX;
+        panY += args.ClientY - lastY;
+        lastX = args.ClientX;
+        lastY = args.ClientY;
+    }
+
+    private void EndPan() => panning = false;
+
+    public void Select(string id)
+    {
+        if (!CanEdit)
+        {
+            return;
+        }
+
+        selected = Document?.Plots.FirstOrDefault(plot => plot.Id == id);
+    }
+
+    private async Task SaveAsync()
+    {
+        if (selected?.Area is not null)
+        {
+            selected.Area.Source = "manual";
+        }
+
+        await SaveRequested.InvokeAsync();
+    }
+
+    private void SetArea(ChangeEventArgs args)
+    {
+        if (selected is null)
+        {
+            return;
+        }
+
+        selected.Area ??= new MeasuredValueModel { Source = "manual", Unit = "cent" };
+        selected.Area.Value = decimal.TryParse(args.Value?.ToString(), out var value) ? value : null;
+        selected.Area.Unit = "cent";
+        selected.Area.Source = "manual";
+        if (Document is not null)
+        {
+            Document.Coordinates.AreaUnit = "cent";
+        }
+    }
+
+    private static string Points(List<NormPointModel> vertices, int width, int height) =>
+        string.Join(" ", vertices.Select(point =>
+            $"{(point.X * width).ToString(System.Globalization.CultureInfo.InvariantCulture)},{(point.Y * height).ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
+
+    private static (double X, double Y) Center(List<NormPointModel> vertices, int width, int height)
+    {
+        if (vertices.Count == 0)
+        {
+            return (0, 0);
+        }
+
+        return (vertices.Average(point => point.X) * width, vertices.Average(point => point.Y) * height);
+    }
+}

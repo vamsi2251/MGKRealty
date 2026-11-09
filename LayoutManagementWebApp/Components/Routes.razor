@@ -1,0 +1,45 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@inject JwtAuthStateProvider Auth
+
+@if (!ready)
+{
+    <p class="content px-4">Loading...</p>
+}
+else
+{
+    <CascadingAuthenticationState>
+        <Router AppAssembly="typeof(Program).Assembly">
+            <Found Context="routeData">
+                <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+                    <NotAuthorized>
+                        <LayoutView Layout="typeof(Layout.MainLayout)">
+                            @if (context.User.Identity?.IsAuthenticated == true)
+                            {
+                                <p role="alert">You do not have access to this page.</p>
+                            }
+                            else
+                            {
+                                <RedirectToLogin />
+                            }
+                        </LayoutView>
+                    </NotAuthorized>
+                </AuthorizeRouteView>
+                <FocusOnNavigate RouteData="routeData" Selector="h1" />
+            </Found>
+        </Router>
+    </CascadingAuthenticationState>
+}
+
+@code {
+    private bool ready;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Auth.RestoreAsync();
+            ready = true;
+            StateHasChanged();
+        }
+    }
+}

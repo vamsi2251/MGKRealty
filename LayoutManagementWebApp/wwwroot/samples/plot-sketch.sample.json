@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "1.0",
+  "layoutName": "Layout sketch",
+  "unit": "cent",
+  "notes": "Same split as the uploaded sketch. Vertices are feet. Area is cents, and 1 cent = 435.6 sq ft.",
+  "plots": [
+    { "plotNumber": "1", "area": 2.75, "lengthFeet": 40, "breadthFeet": 30, "facing": "North", "vertices": [ { "x": 0, "y": 300 }, { "x": 30, "y": 300 }, { "x": 30, "y": 340 }, { "x": 0, "y": 340 } ] },
+    { "plotNumber": "2", "area": 5.51, "lengthFeet": 60, "breadthFeet": 40, "facing": "East", "vertices": [ { "x": 0, "y": 240 }, { "x": 40, "y": 240 }, { "x": 40, "y": 300 }, { "x": 0, "y": 300 } ] },
+    { "plotNumber": "3", "area": 5.51, "lengthFeet": 60, "breadthFeet": 40, "facing": "East", "vertices": [ { "x": 0, "y": 180 }, { "x": 40, "y": 180 }, { "x": 40, "y": 240 }, { "x": 0, "y": 240 } ] },
+    { "plotNumber": "4", "area": 5.51, "lengthFeet": 60, "breadthFeet": 40, "facing": "East", "vertices": [ { "x": 0, "y": 120 }, { "x": 40, "y": 120 }, { "x": 40, "y": 180 }, { "x": 0, "y": 180 } ] },
+    { "plotNumber": "5", "area": 5.51, "lengthFeet": 60, "breadthFeet": 40, "facing": "East", "vertices": [ { "x": 0, "y": 60 }, { "x": 40, "y": 60 }, { "x": 40, "y": 120 }, { "x": 0, "y": 120 } ] },
+    { "plotNumber": "6", "area": 5.51, "lengthFeet": 60, "breadthFeet": 40, "facing": "East", "vertices": [ { "x": 0, "y": 0 }, { "x": 40, "y": 0 }, { "x": 40, "y": 60 }, { "x": 0, "y": 60 } ] },
+    { "plotNumber": "7", "area": 6.89, "lengthFeet": 50, "breadthFeet": 60, "facing": "West", "vertices": [ { "x": 70, "y": 290 }, { "x": 130, "y": 290 }, { "x": 130, "y": 340 }, { "x": 70, "y": 340 } ] },
+    { "plotNumber": "8", "area": 4.13, "lengthFeet": 45, "breadthFeet": 40, "facing": "West", "vertices": [ { "x": 70, "y": 245 }, { "x": 110, "y": 245 }, { "x": 110, "y": 290 }, { "x": 70, "y": 290 } ] },
+    { "plotNumber": "9", "area": 4.13, "lengthFeet": 45, "breadthFeet": 40, "facing": "West", "vertices": [ { "x": 70, "y": 200 }, { "x": 110, "y": 200 }, { "x": 110, "y": 245 }, { "x": 70, "y": 245 } ] },
+    { "plotNumber": "10", "area": 7.58, "lengthFeet": 66, "breadthFeet": 50, "facing": "West", "vertices": [ { "x": 70, "y": 134 }, { "x": 120, "y": 134 }, { "x": 120, "y": 200 }, { "x": 70, "y": 200 } ] }
+  ]
+}

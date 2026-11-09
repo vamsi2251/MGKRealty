@@ -1,0 +1,54 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: LayoutManagementAPI/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__RealEstate: Data Source=/data/realestate.db
+      Jwt__Issuer: LayoutManagement
+      Jwt__Key: ${JWT_KEY:?Set JWT_KEY in .env}
+      Admin__Email: ${ADMIN_EMAIL:?Set ADMIN_EMAIL in .env}
+      Admin__Password: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      SuperAdmin__UserName: ${SUPERADMIN_USERNAME:-}
+      SuperAdmin__Email: ${SUPERADMIN_EMAIL:-}
+      SuperAdmin__Password: ${SUPERADMIN_PASSWORD:-}
+      LayoutExtraction__ApiKey: ${OPENAI_API_KEY:-}
+    volumes:
+      - api-data:/data
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: LayoutManagementWebApp/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ApiBaseUrl: http://api:8080/
+      DataProtection__KeysPath: /keys
+    volumes:
+      - web-keys:/keys
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+    restart: unless-stopped
+
+volumes:
+  api-data:
+  web-keys:
+  caddy-data:
+  caddy-config:
