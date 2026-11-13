@@ -9,6 +9,8 @@
 <h1>Sign in</h1>
 <p class="text-muted">Use your username and password.</p>
 
+<BusyOverlay Visible="busy" Message="Signing in…" />
+
 @if (!string.IsNullOrEmpty(error))
 {
     <div class="alert alert-danger">@error</div>
@@ -26,19 +28,28 @@
         <InputText type="password" class="form-control" @bind-Value="model.Password" />
         <ValidationMessage For="() => model.Password" />
     </div>
-    <button class="btn btn-primary" type="submit">Sign in</button>
+    <button class="btn btn-primary" type="submit" disabled="@busy">
+        @if (busy)
+        {
+            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+        }
+        Sign in
+    </button>
     <a class="btn btn-link" href="signup">Create an account</a>
 </EditForm>
 
 @code {
     private readonly LoginModel model = new();
     private string? error;
+    private bool busy;
 
     [SupplyParameterFromQuery]
     public string? ReturnUrl { get; set; }
 
     private async Task SignInAsync()
     {
+        busy = true;
+        StateHasChanged();
         try
         {
             var response = await Api.LoginAsync(model);
@@ -61,6 +72,10 @@
         catch (Exception ex)
         {
             error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
         }
     }
 }

@@ -1,0 +1,14 @@
+@if (Visible)
+{
+    <div class="busy-overlay" role="status" aria-live="polite" aria-busy="true">
+        <div class="busy-overlay-box">
+            <div class="spinner-border text-primary" aria-hidden="true"></div>
+            <span class="busy-overlay-text">@Message</span>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public string Message { get; set; } = "Please wait…";
+}

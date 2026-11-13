@@ -41,8 +41,15 @@
             </select>
         </div>
     }
-    <button class="btn btn-primary mt-2" type="button" @onclick="CreateAsync">Create user</button>
+    <button class="btn btn-primary mt-2" type="button" @onclick="CreateAsync" disabled="@busy">
+        @if (busy)
+        {
+            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+        }
+        Create user</button>
 </div>
+
+<BusyOverlay Visible="busy" Message="Working…" />
 
 @if (!string.IsNullOrEmpty(error))
 {
@@ -83,11 +90,11 @@
                 </td>
                 <td><input class="form-control" type="password" placeholder="Leave blank to keep" @bind="user.NewPassword" /></td>
                 <td class="d-flex gap-2">
-                    <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenSketchesAsync(user)">Sketches</button>
-                    <button class="btn btn-sm btn-primary" @onclick="() => SaveCredentialsAsync(user)">Save sign-in</button>
-                    <button class="btn btn-sm btn-primary" @onclick="() => SaveAsync(user)" disabled="@user.IsBuiltInAdmin">Save</button>
-                    <button class="btn btn-sm btn-outline-danger" @onclick="() => RestrictAsync(user, false)" disabled="@user.IsBuiltInAdmin || user.LoginRestricted">Restrict login</button>
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => RestrictAsync(user, true)" disabled="@(!user.LoginRestricted)">Allow login</button>
+                    <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenSketchesAsync(user)" disabled="@busy">Sketches</button>
+                    <button class="btn btn-sm btn-primary" @onclick="() => SaveCredentialsAsync(user)" disabled="@busy">Save sign-in</button>
+                    <button class="btn btn-sm btn-primary" @onclick="() => SaveAsync(user)" disabled="@(busy || user.IsBuiltInAdmin)">Save</button>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => RestrictAsync(user, false)" disabled="@(busy || user.IsBuiltInAdmin || user.LoginRestricted)">Restrict login</button>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => RestrictAsync(user, true)" disabled="@(busy || !user.LoginRestricted)">Allow login</button>
                 </td>
             </tr>
         }
@@ -110,7 +117,12 @@
                 </select>
             </div>
         }
-        <button class="btn btn-primary" type="button" @onclick="SaveSketchesAsync">Save sketch access</button>
+        <button class="btn btn-primary" type="button" @onclick="SaveSketchesAsync" disabled="@busy">
+            @if (busy)
+            {
+                <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+            }
+            Save sketch access</button>
     </div>
 }
 
@@ -120,6 +132,7 @@
     private UserModel? selectedUser;
     private string? error;
     private string? message;
+    private bool busy;
     private string newName = "";
     private string newUsername = "";
     private string newEmail = "";
@@ -153,6 +166,8 @@
 
     private async Task RestrictAsync(UserModel user, bool allowed)
     {
+        busy = true;
+        StateHasChanged();
         try
         {
             await Api.SetLoginAccessAsync(user.Id, allowed);
@@ -163,6 +178,10 @@
         catch (Exception ex)
         {
             error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
         }
     }
 
@@ -201,6 +220,8 @@
 
     private async Task CreateAsync()
     {
+        busy = true;
+        StateHasChanged();
         try
         {
             await Api.CreateUserAsync(newName, newUsername, newEmail, newPassword, SelectedSketches(newSketchIds, newLevels));
@@ -214,10 +235,16 @@
         {
             error = ex.Message;
         }
+        finally
+        {
+            busy = false;
+        }
     }
 
     private async Task OpenSketchesAsync(UserModel user)
     {
+        busy = true;
+        StateHasChanged();
         try
         {
             selectedUser = user;
@@ -236,6 +263,10 @@
         {
             error = ex.Message;
         }
+        finally
+        {
+            busy = false;
+        }
     }
 
     private async Task SaveSketchesAsync()
@@ -245,6 +276,8 @@
             return;
         }
 
+        busy = true;
+        StateHasChanged();
         try
         {
             await Api.SaveUserSketchesAsync(selectedUser.Id, SelectedSketches(editSketchIds, editLevels));
@@ -255,10 +288,16 @@
         {
             error = ex.Message;
         }
+        finally
+        {
+            busy = false;
+        }
     }
 
     private async Task SaveCredentialsAsync(UserModel user)
     {
+        busy = true;
+        StateHasChanged();
         var state = await Auth.GetAuthenticationStateAsync();
         var changingCurrentAccount = string.Equals(state.User.Identity?.Name, user.OriginalUsername, StringComparison.OrdinalIgnoreCase);
         try
@@ -280,10 +319,16 @@
         {
             error = ex.Message;
         }
+        finally
+        {
+            busy = false;
+        }
     }
 
     private async Task SaveAsync(UserModel user)
     {
+        busy = true;
+        StateHasChanged();
         try
         {
             await Api.SetRoleAsync(user.Id, user.Role);
@@ -294,6 +339,10 @@
         catch (Exception ex)
         {
             error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
         }
     }
 }

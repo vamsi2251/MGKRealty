@@ -1,3 +1,5 @@
+<BusyOverlay Visible="busy" Message="Saving…" />
+
 @if (Document is null || Document.CanvasWidth <= 0 || Document.CanvasHeight <= 0)
 {
     <p>This layout has no canvas dimensions yet.</p>
@@ -9,7 +11,12 @@ else
         <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="ZoomIn">Zoom in</button>
         @if (CanEdit)
         {
-            <button class="btn btn-sm btn-primary" type="button" @onclick="SaveAsync">Save layout</button>
+            <button class="btn btn-sm btn-primary" type="button" @onclick="SaveAsync" disabled="@busy">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                }
+                Save layout</button>
         }
     </div>
     <div class="layout-viewport"
@@ -80,6 +87,7 @@ else
     [Parameter] public bool CanEdit { get; set; } = true;
 
     private DocumentPlotModel? selected;
+    private bool busy;
     private double zoom = 1;
     private double panX;
     private double panY;
@@ -165,12 +173,21 @@ else
 
     private async Task SaveAsync()
     {
-        if (selected?.Area is not null)
+        busy = true;
+        StateHasChanged();
+        try
         {
-            selected.Area.Source = "manual";
-        }
+            if (selected?.Area is not null)
+            {
+                selected.Area.Source = "manual";
+            }
 
-        await SaveRequested.InvokeAsync();
+            await SaveRequested.InvokeAsync();
+        }
+        finally
+        {
+            busy = false;
+        }
     }
 
     private void SetArea(ChangeEventArgs args)

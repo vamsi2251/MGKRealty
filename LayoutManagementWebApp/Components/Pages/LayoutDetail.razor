@@ -17,6 +17,7 @@
 }
 else
 {
+    <BusyOverlay Visible="busy" Message="Working…" />
     <div class="d-flex justify-content-between align-items-start gap-3 stack-mobile">
         <div>
             <label class="form-label" for="saved-layout-name">Layout name</label>
@@ -32,7 +33,12 @@ else
             <div class="d-flex flex-column gap-2">
                 @if (plan.CompletedOn is null && plan.Plots.Count > 0 && plan.Plots.All(plot => plot.Status == PlotStatus.Sold))
                 {
-                    <button class="btn btn-success" type="button" @onclick="CompleteAsync">Complete layout</button>
+                    <button class="btn btn-success" type="button" @onclick="CompleteAsync" disabled="@busy">
+                        @if (busy)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                        }
+                        Complete layout</button>
                 }
                 else if (plan.CompletedOn is null)
                 {
@@ -42,7 +48,12 @@ else
                 {
                     <p class="text-muted mb-0">Completed @plan.CompletedOn.Value.ToLocalTime().ToString("MMM d, yyyy")</p>
                 }
-                <button class="btn btn-outline-danger" type="button" @onclick="DeleteAsync">Delete layout</button>
+                <button class="btn btn-outline-danger" type="button" @onclick="DeleteAsync" disabled="@busy">
+                    @if (busy)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                    }
+                    Delete layout</button>
             </div>
         }
     </div>
@@ -70,7 +81,12 @@ else
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <button class="btn btn-primary" type="button" @onclick="AddPartnerAsync">Add partner</button>
+                    <button class="btn btn-primary" type="button" @onclick="AddPartnerAsync" disabled="@busy">
+                        @if (busy)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                        }
+                        Add partner</button>
                 </div>
             </div>
             @foreach (var partner in partners)
@@ -78,7 +94,7 @@ else
                 <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
                     <span>@partner.FullName (@partner.Username)</span>
                     <span class="badge text-bg-secondary">@(partner.Level == "Editable" ? "Editable" : "Read only")</span>
-                    <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="() => RemovePartnerAsync(partner.UserId)">Remove</button>
+                    <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="() => RemovePartnerAsync(partner.UserId)" disabled="@busy">Remove</button>
                 </div>
             }
         </div>
@@ -87,7 +103,12 @@ else
     <p class="text-muted">Review status: @(plan.Document?.Extraction.Status ?? "not extracted"). Provider: @(plan.Document?.Extraction.Provider ?? "none"). Extraction uses ChatGPT vision when an OpenAI API key is configured.</p>
     @if (canEdit)
     {
-        <button class="btn btn-outline-primary mb-3" type="button" @onclick="ExtractAsync">Extract with ChatGPT</button>
+        <button class="btn btn-outline-primary mb-3" type="button" @onclick="ExtractAsync" disabled="@busy">
+            @if (busy)
+            {
+                <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+            }
+            Extract with ChatGPT</button>
     }
     <LayoutCanvas Document="plan.Document" ImageUrl="@sketchUrl" CanEdit="canEdit" DocumentChanged="OnDocumentChanged" SaveRequested="SaveDocumentAsync" />
     @if (plan.Document?.Extraction.Warnings.Count > 0)
@@ -111,7 +132,12 @@ else
         </select>
         @if (canEdit)
         {
-            <button class="btn btn-outline-primary" type="button" @onclick="AddRowAsync">Add row</button>
+            <button class="btn btn-outline-primary" type="button" @onclick="AddRowAsync" disabled="@busy">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                }
+                Add row</button>
         }
     </div>
     <div class="table-scroll">
@@ -153,7 +179,7 @@ else
                     <td>@plot.Status</td>
                     <td class="plot-comment">@plot.Comment</td>
                     <td>@(plot.HasSurvey ? plot.SurveyFileName : "")</td>
-                    <td>@if (canEdit) { <button class="btn btn-sm btn-outline-primary" @onclick="() => EditAsync(plot)">Manage</button> }</td>
+                    <td>@if (canEdit) { <button class="btn btn-sm btn-outline-primary" @onclick="() => EditAsync(plot)" disabled="@busy">Manage</button> }</td>
                 </tr>
             }
         </tbody>
@@ -202,7 +228,12 @@ else
                         <input id="owner-payable" class="form-control mb-2" type="number" min="0" step="0.01" @bind="ownerPayable" disabled="@(!canEdit)" />
                         @if (canEdit)
                         {
-                            <button class="btn btn-outline-primary mb-3" type="button" @onclick="SaveOwnerAsync">Save payable amount</button>
+                            <button class="btn btn-outline-primary mb-3" type="button" @onclick="SaveOwnerAsync" disabled="@busy">
+                                @if (busy)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                                }
+                                Save payable amount</button>
                         }
                         <p>Paid @Money(plan.OwnerPaid). Remaining @Money(plan.OwnerRemaining).</p>
                         @if (canEdit)
@@ -217,7 +248,12 @@ else
                                 <input class="form-control" type="number" min="0.01" step="0.01" @bind="ownerPaymentAmount" />
                             </div>
                             <div class="col-md-3 d-flex align-items-end">
-                                <button class="btn btn-primary" type="button" @onclick="AddOwnerPaymentAsync">Add payment</button>
+                                <button class="btn btn-primary" type="button" @onclick="AddOwnerPaymentAsync" disabled="@busy">
+                                    @if (busy)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                                    }
+                                    Add payment</button>
                             </div>
                         </div>
                         }
@@ -228,8 +264,8 @@ else
                                 <input class="form-control" style="max-width: 9rem;" type="number" min="0.01" step="0.01" @bind="payment.Amount" disabled="@(!canEdit)" />
                                 @if (canEdit)
                                 {
-                                    <button class="btn btn-outline-primary" type="button" @onclick="() => UpdateOwnerPaymentAsync(payment)">Update</button>
-                                    <button class="btn btn-outline-secondary" type="button" @onclick="() => DeleteOwnerPaymentAsync(payment.Id)">Remove</button>
+                                    <button class="btn btn-outline-primary" type="button" @onclick="() => UpdateOwnerPaymentAsync(payment)" disabled="@busy">Update</button>
+                                    <button class="btn btn-outline-secondary" type="button" @onclick="() => DeleteOwnerPaymentAsync(payment.Id)" disabled="@busy">Remove</button>
                                 }
                             </div>
                         }
@@ -276,7 +312,12 @@ else
                     <div class="modal-footer">
                         @if (canEdit)
                         {
-                            <button class="btn btn-primary" type="button" @onclick="SaveExpensesAsync">Save expenses</button>
+                            <button class="btn btn-primary" type="button" @onclick="SaveExpensesAsync" disabled="@busy">
+                                @if (busy)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                                }
+                                Save expenses</button>
                         }
                         <button class="btn btn-secondary" type="button" @onclick="() => showExpenses = false">Close</button>
                     </div>
@@ -374,7 +415,12 @@ else
                             </div>
                         </div>
                         <div class="modal-footer">
-                            <button class="btn btn-primary" type="submit">Save booking</button>
+                            <button class="btn btn-primary" type="submit" disabled="@busy">
+                                @if (busy)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                                }
+                                Save booking</button>
                             <button class="btn btn-outline-secondary" type="button" @onclick="Cancel">Cancel</button>
                         </div>
                     </EditForm>
@@ -399,6 +445,7 @@ else
     private string? surveyPreview;
     private bool removeSurvey;
     private string? error;
+    private bool busy;
     private bool canManage;
     private bool canEdit;
     private bool canShare;
@@ -499,6 +546,8 @@ else
             return;
         }
 
+        busy = true;
+        StateHasChanged();
         try
         {
             var image = await Api.GetPlotSurveyAsync(plot.Id);
@@ -510,6 +559,10 @@ else
         catch (Exception ex)
         {
             error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
         }
     }
 
@@ -576,6 +629,8 @@ else
             editing.Status = PlotStatus.Blocked;
         }
 
+        busy = true;
+        StateHasChanged();
         try
         {
             await Api.SaveBookingAsync(editing);
@@ -600,6 +655,10 @@ else
         {
             error = ex.Message;
         }
+        finally
+        {
+            busy = false;
+        }
     }
 
     private void OnDocumentChanged(LayoutDocumentModel document)
@@ -612,6 +671,8 @@ else
 
     private async Task ExtractAsync()
     {
+        busy = true;
+        StateHasChanged();
         try
         {
             var updated = await Api.ExtractLayoutAsync(Id);
@@ -623,6 +684,10 @@ else
         catch (Exception ex)
         {
             error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
         }
     }
 
@@ -640,6 +705,8 @@ else
         }
 
         plan.Document.Name = layoutName.Trim();
+        busy = true;
+        StateHasChanged();
         try
         {
             var updated = await Api.SaveDocumentAsync(Id, plan.Document);
@@ -655,10 +722,16 @@ else
         {
             error = ex.Message;
         }
+        finally
+        {
+            busy = false;
+        }
     }
 
     private async Task CompleteAsync()
     {
+        busy = true;
+        StateHasChanged();
         try
         {
             var updated = await Api.CompleteLayoutAsync(Id);
@@ -674,6 +747,10 @@ else
         {
             error = ex.Message;
         }
+        finally
+        {
+            busy = false;
+        }
     }
 
     private async Task AddPartnerAsync()
@@ -684,6 +761,8 @@ else
             return;
         }
 
+        busy = true;
+        StateHasChanged();
         try
         {
             partners = await Api.AddPartnerAsync(Id, partnerUserId, partnerLevel) ?? partners;
@@ -694,10 +773,16 @@ else
         {
             error = ex.Message;
         }
+        finally
+        {
+            busy = false;
+        }
     }
 
     private async Task RemovePartnerAsync(string userId)
     {
+        busy = true;
+        StateHasChanged();
         try
         {
             partners = await Api.RemovePartnerAsync(Id, userId) ?? partners;
@@ -707,10 +792,16 @@ else
         {
             error = ex.Message;
         }
+        finally
+        {
+            busy = false;
+        }
     }
 
     private async Task DeleteAsync()
     {
+        busy = true;
+        StateHasChanged();
         try
         {
             await Api.DeleteLayoutAsync(Id);
@@ -719,6 +810,10 @@ else
         catch (Exception ex)
         {
             error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
         }
     }
 
@@ -818,6 +913,8 @@ else
 
     private async Task AddRowAsync()
     {
+        busy = true;
+        StateHasChanged();
         try
         {
             var plot = await Api.AddPlotRowAsync(Id);
@@ -846,10 +943,16 @@ else
         {
             error = ex.Message;
         }
+        finally
+        {
+            busy = false;
+        }
     }
 
     private async Task SaveOwnerAsync()
     {
+        busy = true;
+        StateHasChanged();
         try
         {
             ApplyFinance(await Api.SaveOwnerPayableAsync(Id, ownerPayable));
@@ -859,10 +962,16 @@ else
         {
             error = ex.Message;
         }
+        finally
+        {
+            busy = false;
+        }
     }
 
     private async Task AddOwnerPaymentAsync()
     {
+        busy = true;
+        StateHasChanged();
         try
         {
             ApplyFinance(await Api.AddOwnerPaymentAsync(Id, ownerPaidOn, ownerPaymentAmount));
@@ -873,10 +982,16 @@ else
         {
             error = ex.Message;
         }
+        finally
+        {
+            busy = false;
+        }
     }
 
     private async Task UpdateOwnerPaymentAsync(OwnerPaymentModel payment)
     {
+        busy = true;
+        StateHasChanged();
         try
         {
             ApplyFinance(await Api.UpdateOwnerPaymentAsync(Id, payment));
@@ -886,10 +1001,16 @@ else
         {
             error = ex.Message;
         }
+        finally
+        {
+            busy = false;
+        }
     }
 
     private async Task DeleteOwnerPaymentAsync(int paymentId)
     {
+        busy = true;
+        StateHasChanged();
         try
         {
             ApplyFinance(await Api.DeleteOwnerPaymentAsync(Id, paymentId));
@@ -899,10 +1020,16 @@ else
         {
             error = ex.Message;
         }
+        finally
+        {
+            busy = false;
+        }
     }
 
     private async Task SaveExpensesAsync()
     {
+        busy = true;
+        StateHasChanged();
         try
         {
             ApplyFinance(await Api.SaveExpensesAsync(Id, surveyorAmount, tipperCount, tipperCost, miscellaneousAmount));
@@ -912,6 +1039,10 @@ else
         catch (Exception ex)
         {
             error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
         }
     }
 

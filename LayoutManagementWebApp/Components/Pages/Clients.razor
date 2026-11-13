@@ -6,6 +6,8 @@
 
 <h1>Clients</h1>
 
+<BusyOverlay Visible="busy" Message="Working…" />
+
 @if (!string.IsNullOrEmpty(error))
 {
     <div class="alert alert-danger">@error</div>
@@ -45,7 +47,12 @@
             </div>
         </div>
         <div class="mt-3 d-flex gap-2">
-            <button class="btn btn-primary" type="submit">Save</button>
+            <button class="btn btn-primary" type="submit" disabled="@busy">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                }
+                Save</button>
             <button class="btn btn-outline-secondary" type="button" @onclick="Cancel">Cancel</button>
         </div>
     </EditForm>
@@ -66,7 +73,7 @@
                 <td>@client.ClientType</td>
                 <td class="text-nowrap">
                     <button class="btn btn-sm btn-outline-primary" @onclick="() => Edit(client)">Edit</button>
-                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(client)">Delete</button>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(client)" disabled="@busy">Delete</button>
                 </td>
             </tr>
         }
@@ -78,6 +85,7 @@
     private List<ClientModel> clients = new();
     private ClientModel? editing;
     private string? error;
+    private bool busy;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -114,6 +122,8 @@
             return;
         }
 
+        busy = true;
+        StateHasChanged();
         try
         {
             await Api.SaveClientAsync(editing);
@@ -124,10 +134,16 @@
         {
             error = ex.Message;
         }
+        finally
+        {
+            busy = false;
+        }
     }
 
     private async Task DeleteAsync(ClientModel client)
     {
+        busy = true;
+        StateHasChanged();
         try
         {
             await Api.DeleteClientAsync(client.Id);
@@ -136,6 +152,10 @@
         catch (Exception ex)
         {
             error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
         }
     }
 }

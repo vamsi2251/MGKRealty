@@ -34,7 +34,7 @@
                     <td>
                         @if (!reminder.IsRead)
                         {
-                            <button class="btn btn-sm btn-outline-primary" type="button" @onclick="() => MarkReadAsync(reminder)">Mark read</button>
+                            <button class="btn btn-sm btn-outline-primary" type="button" @onclick="() => MarkReadAsync(reminder)" disabled="@busy">Mark read</button>
                         }
                     </td>
                 </tr>
@@ -43,6 +43,8 @@
     </table>
     </div>
 }
+
+<BusyOverlay Visible="busy" Message="Working…" />
 
 @if (!string.IsNullOrEmpty(error))
 {
@@ -85,6 +87,7 @@ else
     private List<LayoutSummaryModel>? layouts;
     private List<RegistrationReminderModel> reminders = new();
     private string? error;
+    private bool busy;
 
     protected override async Task OnInitializedAsync()
     {
@@ -101,6 +104,8 @@ else
 
     private async Task MarkReadAsync(RegistrationReminderModel reminder)
     {
+        busy = true;
+        StateHasChanged();
         try
         {
             await Api.MarkNotificationReadAsync(reminder.Id);
@@ -109,6 +114,10 @@ else
         catch (Exception ex)
         {
             error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
         }
     }
 }

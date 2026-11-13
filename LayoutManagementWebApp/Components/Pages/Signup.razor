@@ -9,6 +9,8 @@
 <h1>Sign up</h1>
 <p class="text-muted">New accounts start as users. An administrator can grant admin access.</p>
 
+<BusyOverlay Visible="busy" Message="Creating account…" />
+
 @if (!string.IsNullOrEmpty(error))
 {
     <div class="alert alert-danger">@error</div>
@@ -37,16 +39,25 @@
         <ValidationMessage For="() => model.Password" />
         <div class="form-text">At least 8 characters, with uppercase, lowercase, and a number.</div>
     </div>
-    <button class="btn btn-primary" type="submit">Create account</button>
+    <button class="btn btn-primary" type="submit" disabled="@busy">
+        @if (busy)
+        {
+            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+        }
+        Create account
+    </button>
     <a class="btn btn-link" href="login">Sign in</a>
 </EditForm>
 
 @code {
     private readonly RegisterModel model = new();
     private string? error;
+    private bool busy;
 
     private async Task RegisterAsync()
     {
+        busy = true;
+        StateHasChanged();
         try
         {
             var response = await Api.RegisterAsync(model);
@@ -62,6 +73,10 @@
         catch (Exception ex)
         {
             error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
         }
     }
 }

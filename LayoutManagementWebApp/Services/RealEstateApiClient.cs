@@ -358,7 +358,115 @@ public class RealEstateApiClient
         }
 
         var body = await response.Content.ReadAsStringAsync();
-        var detail = string.IsNullOrWhiteSpace(body) ? response.ReasonPhrase : body;
-        throw new InvalidOperationException($"{(int)response.StatusCode}: {detail}");
+        throw new InvalidOperationException(BuildFriendlyMessage(response.StatusCode, body));
+    }
+
+    private static string BuildFriendlyMessage(System.Net.HttpStatusCode statusCode, string? body)
+    {
+        var parsed = ExtractMessage(body);
+        if (!string.IsNullOrWhiteSpace(parsed))
+        {
+            return parsed!;
+        }
+
+        return (int)statusCode switch
+        {
+            400 or 409 => "That request could not be completed. Please review your input and try again.",
+            401 => "The username or password is incorrect.",
+            403 => "You don't have access to this.",
+            404 => "We couldn't find what you were looking for.",
+            >= 500 => "Something went wrong on our side. Please try again.",
+            _ => "That request could not be completed. Please try again."
+        };
+    }
+
+    // Turns an API error body (ProblemDetails validation JSON, a {errors,warnings} object,
+    // a JSON-quoted string, or plain text) into one short, user-friendly sentence.
+    private static string? ExtractMessage(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return null;
+        }
+
+        body = body.Trim();
+        if (body[0] is not ('{' or '['  or '"'))
+        {
+            return body;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+
+            if (root.ValueKind == JsonValueKind.String)
+            {
+                return root.GetString();
+            }
+
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                // ProblemDetails validation errors, or the {errors, warnings} import shape.
+                if (root.TryGetProperty("errors", out var errors))
+                {
+                    var messages = CollectStrings(errors).Distinct().ToList();
+                    if (messages.Count > 0)
+                    {
+                        return string.Join(" ", messages);
+                    }
+                }
+
+                if (root.TryGetProperty("detail", out var detail) && detail.ValueKind == JsonValueKind.String
+                    && !string.IsNullOrWhiteSpace(detail.GetString()))
+                {
+                    return detail.GetString();
+                }
+
+                if (root.TryGetProperty("title", out var title) && title.ValueKind == JsonValueKind.String)
+                {
+                    return title.GetString();
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            // Not JSON after all — fall through to showing the raw text.
+            return body;
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<string> CollectStrings(JsonElement element)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.String:
+                var value = element.GetString();
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    yield return value!;
+                }
+                break;
+            case JsonValueKind.Array:
+                foreach (var item in element.EnumerateArray())
+                {
+                    foreach (var message in CollectStrings(item))
+                    {
+                        yield return message;
+                    }
+                }
+                break;
+            case JsonValueKind.Object:
+                foreach (var property in element.EnumerateObject())
+                {
+                    foreach (var message in CollectStrings(property.Value))
+                    {
+                        yield return message;
+                    }
+                }
+                break;
+        }
     }
 }

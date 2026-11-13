@@ -8,6 +8,8 @@
 <h1>Plot sketches</h1>
 <p class="text-muted">Choose ChatGPT extraction, a plot count with an image, or a layout document JSON. You only see the sketches you uploaded.</p>
 
+<BusyOverlay Visible="uploading" Message="Uploading sketch…" />
+
 @if (!string.IsNullOrEmpty(error))
 {
     <div class="alert alert-danger">@error</div>
@@ -61,7 +63,13 @@
     {
         <p class="mt-2 mb-3">Selected: @selectedName</p>
     }
-    <button type="button" class="btn btn-primary mt-3" disabled="@(uploading || selectedBytes is null)" @onclick="UploadAsync">Upload</button>
+    <button type="button" class="btn btn-primary mt-3" disabled="@(uploading || selectedBytes is null)" @onclick="UploadAsync">
+        @if (uploading)
+        {
+            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+        }
+        Upload
+    </button>
 </div>
 
 @if (layouts.Count == 0)
@@ -196,6 +204,7 @@ else
         }
 
         uploading = true;
+        StateHasChanged();
         try
         {
             using var buffer = new MemoryStream(selectedBytes);
