@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "webapp",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--no-launch-profile", "--project", "LayoutManagementWebApp"],
+      "port": 5073,
+      "url": "http://localhost:5073"
+    }
+  ]
+}

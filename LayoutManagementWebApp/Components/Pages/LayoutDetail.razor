@@ -174,78 +174,130 @@ else
         <div class="col-lg-6">
             <div class="card p-3 h-100">
                 <h2>Land owner</h2>
-                <label class="form-label" for="owner-payable">Amount payable</label>
-                <input id="owner-payable" class="form-control mb-2" type="number" min="0" step="0.01" @bind="ownerPayable" disabled="@(!canEdit)" />
-                @if (canEdit)
-                {
-                    <button class="btn btn-outline-primary mb-3" type="button" @onclick="SaveOwnerAsync">Save payable amount</button>
-                }
-                <p>Paid @Money(plan.OwnerPaid). Remaining @Money(plan.OwnerRemaining).</p>
-                @if (canEdit)
-                {
-                <div class="row g-2 mb-3">
-                    <div class="col-md-5">
-                        <label class="form-label">Payment date</label>
-                        <InputDate class="form-control" @bind-Value="ownerPaidOn" />
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Amount</label>
-                        <input class="form-control" type="number" min="0.01" step="0.01" @bind="ownerPaymentAmount" />
-                    </div>
-                    <div class="col-md-3 d-flex align-items-end">
-                        <button class="btn btn-primary" type="button" @onclick="AddOwnerPaymentAsync">Add payment</button>
-                    </div>
-                </div>
-                }
-                @foreach (var payment in plan.OwnerPayments)
-                {
-                    <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
-                        <InputDate class="form-control" style="max-width: 11rem;" @bind-Value="payment.PaidOn" disabled="@(!canEdit)" />
-                        <input class="form-control" style="max-width: 9rem;" type="number" min="0.01" step="0.01" @bind="payment.Amount" disabled="@(!canEdit)" />
-                        @if (canEdit)
-                        {
-                            <button class="btn btn-outline-primary" type="button" @onclick="() => UpdateOwnerPaymentAsync(payment)">Update</button>
-                            <button class="btn btn-outline-secondary" type="button" @onclick="() => DeleteOwnerPaymentAsync(payment.Id)">Remove</button>
-                        }
-                    </div>
-                }
+                <p class="mb-1">Amount payable @Money(plan.OwnerPayable)</p>
+                <p class="mb-3">Paid @Money(plan.OwnerPaid). Remaining @Money(plan.OwnerRemaining).</p>
+                <button class="btn btn-outline-primary align-self-start" type="button" @onclick="() => showOwner = true">@(canEdit ? "Manage land owner" : "View land owner")</button>
             </div>
         </div>
         <div class="col-lg-6">
             <div class="card p-3 h-100">
                 <h2>Development expenses</h2>
-                <label class="form-label">Surveyor amount</label>
-                <input class="form-control mb-2" type="number" min="0" step="0.01" @bind="surveyorAmount" disabled="@(!canEdit)" />
-                <div class="row g-2">
-                    <div class="col-md-4">
-                        <label class="form-label">Tippers</label>
-                        <input class="form-control" type="number" min="0" step="1" @bind="tipperCount" disabled="@(!canEdit)" />
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Cost each</label>
-                        <input class="form-control" type="number" min="0" step="0.01" @bind="tipperCost" disabled="@(!canEdit)" />
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Tipper total</label>
-                        <input class="form-control" readonly value="@Money(tipperCount * tipperCost)" />
-                    </div>
-                </div>
-                <label class="form-label mt-2">Miscellaneous</label>
-                <input class="form-control mb-2" type="number" min="0" step="0.01" @bind="miscellaneousAmount" disabled="@(!canEdit)" />
-                <p>Development total @Money(surveyorAmount + (tipperCount * tipperCost) + miscellaneousAmount).</p>
-                @if (canEdit)
-                {
-                    <button class="btn btn-primary" type="button" @onclick="SaveExpensesAsync">Save expenses</button>
-                }
+                <p class="mb-3">Development total @Money(plan.DevelopmentTotal).</p>
+                <button class="btn btn-outline-primary align-self-start" type="button" @onclick="() => showExpenses = true">@(canEdit ? "Manage development expenses" : "View development expenses")</button>
             </div>
         </div>
     </div>
 
+    @if (showOwner)
+    {
+        <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 class="modal-title h5 mb-0">Land owner</h2>
+                        <button type="button" class="btn-close" aria-label="Close" @onclick="() => showOwner = false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <label class="form-label" for="owner-payable">Amount payable</label>
+                        <input id="owner-payable" class="form-control mb-2" type="number" min="0" step="0.01" @bind="ownerPayable" disabled="@(!canEdit)" />
+                        @if (canEdit)
+                        {
+                            <button class="btn btn-outline-primary mb-3" type="button" @onclick="SaveOwnerAsync">Save payable amount</button>
+                        }
+                        <p>Paid @Money(plan.OwnerPaid). Remaining @Money(plan.OwnerRemaining).</p>
+                        @if (canEdit)
+                        {
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-5">
+                                <label class="form-label">Payment date</label>
+                                <InputDate class="form-control" @bind-Value="ownerPaidOn" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Amount</label>
+                                <input class="form-control" type="number" min="0.01" step="0.01" @bind="ownerPaymentAmount" />
+                            </div>
+                            <div class="col-md-3 d-flex align-items-end">
+                                <button class="btn btn-primary" type="button" @onclick="AddOwnerPaymentAsync">Add payment</button>
+                            </div>
+                        </div>
+                        }
+                        @foreach (var payment in plan.OwnerPayments)
+                        {
+                            <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                                <InputDate class="form-control" style="max-width: 11rem;" @bind-Value="payment.PaidOn" disabled="@(!canEdit)" />
+                                <input class="form-control" style="max-width: 9rem;" type="number" min="0.01" step="0.01" @bind="payment.Amount" disabled="@(!canEdit)" />
+                                @if (canEdit)
+                                {
+                                    <button class="btn btn-outline-primary" type="button" @onclick="() => UpdateOwnerPaymentAsync(payment)">Update</button>
+                                    <button class="btn btn-outline-secondary" type="button" @onclick="() => DeleteOwnerPaymentAsync(payment.Id)">Remove</button>
+                                }
+                            </div>
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" type="button" @onclick="() => showOwner = false">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop fade show"></div>
+    }
+
+    @if (showExpenses)
+    {
+        <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 class="modal-title h5 mb-0">Development expenses</h2>
+                        <button type="button" class="btn-close" aria-label="Close" @onclick="() => showExpenses = false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <label class="form-label">Surveyor amount</label>
+                        <input class="form-control mb-2" type="number" min="0" step="0.01" @bind="surveyorAmount" disabled="@(!canEdit)" />
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="form-label">Tippers</label>
+                                <input class="form-control" type="number" min="0" step="1" @bind="tipperCount" disabled="@(!canEdit)" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Cost each</label>
+                                <input class="form-control" type="number" min="0" step="0.01" @bind="tipperCost" disabled="@(!canEdit)" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Tipper total</label>
+                                <input class="form-control" readonly value="@Money(tipperCount * tipperCost)" />
+                            </div>
+                        </div>
+                        <label class="form-label mt-2">Miscellaneous</label>
+                        <input class="form-control mb-2" type="number" min="0" step="0.01" @bind="miscellaneousAmount" disabled="@(!canEdit)" />
+                        <p>Development total @Money(surveyorAmount + (tipperCount * tipperCost) + miscellaneousAmount).</p>
+                    </div>
+                    <div class="modal-footer">
+                        @if (canEdit)
+                        {
+                            <button class="btn btn-primary" type="button" @onclick="SaveExpensesAsync">Save expenses</button>
+                        }
+                        <button class="btn btn-secondary" type="button" @onclick="() => showExpenses = false">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop fade show"></div>
+    }
+
     @if (canEdit && editing is not null)
     {
-        <EditForm Model="editing" OnValidSubmit="SaveAsync" class="card p-3">
-            <h2>Plot @editing.PlotNumber</h2>
-            <div class="row g-3">
+        <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <EditForm Model="editing" OnValidSubmit="SaveAsync">
+                        <div class="modal-header">
+                            <h2 class="modal-title h5 mb-0">Plot @editing.PlotNumber</h2>
+                            <button type="button" class="btn-close" aria-label="Close" @onclick="Cancel"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row g-3">
                 <div class="col-md-3">
                     <label class="form-label">Area (cent)</label>
                     <InputNumber class="form-control" @bind-Value="editing.Area" />
@@ -319,12 +371,17 @@ else
                         <button class="btn btn-sm btn-outline-danger mt-2" type="button" @onclick="ClearSurvey">Remove survey sketch</button>
                     }
                 </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-primary" type="submit">Save booking</button>
+                            <button class="btn btn-outline-secondary" type="button" @onclick="Cancel">Cancel</button>
+                        </div>
+                    </EditForm>
+                </div>
             </div>
-            <div class="mt-3 d-flex gap-2">
-                <button class="btn btn-primary" type="submit">Save booking</button>
-                <button class="btn btn-outline-secondary" type="button" @onclick="Cancel">Cancel</button>
-            </div>
-        </EditForm>
+        </div>
+        <div class="modal-backdrop fade show"></div>
     }
 }
 
@@ -358,6 +415,8 @@ else
     private int tipperCount;
     private decimal tipperCost;
     private decimal miscellaneousAmount;
+    private bool showOwner;
+    private bool showExpenses;
 
     private IEnumerable<PlotModel> FilteredPlots =>
         plan?.Plots.Where(plot => statusFilter == "all" || plot.Status.ToString() == statusFilter) ?? [];
@@ -847,6 +906,7 @@ else
         try
         {
             ApplyFinance(await Api.SaveExpensesAsync(Id, surveyorAmount, tipperCount, tipperCost, miscellaneousAmount));
+            showExpenses = false;
             error = null;
         }
         catch (Exception ex)

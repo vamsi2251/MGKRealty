@@ -236,4 +236,17 @@ h1:focus {
     .sketch-photo {
         max-width: 100%;
     }
+
+    .modal-dialog {
+        margin: 0.5rem;
+        max-width: none;
+    }
+
+    .modal-dialog.modal-dialog-scrollable {
+        height: calc(100% - 1rem);
+    }
+
+    .modal-footer .btn {
+        min-height: 2.75rem;
+    }
 }
