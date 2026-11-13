@@ -52,16 +52,10 @@ public class RealEstateDbContext : DbContext
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<Inquiry>()
-            .HasOne(i => i.Property)
-            .WithMany(p => p.Inquiries)
-            .HasForeignKey(i => i.PropertyId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        modelBuilder.Entity<Inquiry>()
-            .HasOne(i => i.Client)
-            .WithMany(c => c.Inquiries)
-            .HasForeignKey(i => i.ClientId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .HasOne(i => i.LayoutPlan)
+            .WithMany()
+            .HasForeignKey(i => i.LayoutPlanId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         modelBuilder.Entity<Plot>()
             .Property(p => p.Area)

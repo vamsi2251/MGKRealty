@@ -19,6 +19,4 @@ public class Client
 
     [MaxLength(256)]
     public string CreatedBy { get; set; } = "";
-
-    public List<Inquiry> Inquiries { get; set; } = new();
 }

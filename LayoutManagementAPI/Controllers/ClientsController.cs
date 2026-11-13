@@ -67,11 +67,6 @@ public class ClientsController : ControllerBase
             return NotFound();
         }
 
-        if (await _db.Inquiries.AnyAsync(i => i.ClientId == id))
-        {
-            return Conflict("Close or remove this client's inquiries before deleting the client.");
-        }
-
         if (await _db.Plots.AnyAsync(plot => plot.ClientId == id))
         {
             return Conflict("Remove this client from plots before deleting the client.");

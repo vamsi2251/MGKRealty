@@ -29,7 +29,7 @@ public class DashboardController : ControllerBase
             AvailableCount = properties.Count(p => p.Status == ListingStatus.Available),
             AgentCount = await _db.Agents.CountAsync(),
             ClientCount = await _db.Clients.CountAsync(),
-            OpenInquiryCount = await _db.Inquiries.CountAsync(i => i.Status != InquiryStatus.Closed),
+            OpenInquiryCount = await _db.Inquiries.CountAsync(),
             ListedSaleValue = properties
                 .Where(p => p.ListingType == ListingType.Sale && p.Status is ListingStatus.Available or ListingStatus.Pending)
                 .Sum(p => p.Price),

@@ -132,27 +132,26 @@ public class PropertyRequest
 public class InquiryDto
 {
     public int Id { get; set; }
-    public int PropertyId { get; set; }
-    public string PropertyTitle { get; set; } = "";
-    public int ClientId { get; set; }
     public string ClientName { get; set; } = "";
+    public string Phone { get; set; } = "";
+    public int? LayoutPlanId { get; set; }
+    public string LayoutName { get; set; } = "";
     public string Message { get; set; } = "";
-    public InquiryStatus Status { get; set; }
     public DateTime CreatedOn { get; set; }
 }
 
 public class InquiryRequest
 {
-    [Range(1, int.MaxValue)]
-    public int PropertyId { get; set; }
+    [Required, MaxLength(120)]
+    public string ClientName { get; set; } = "";
 
-    [Range(1, int.MaxValue)]
-    public int ClientId { get; set; }
+    [Required, MaxLength(30)]
+    public string Phone { get; set; } = "";
 
-    [Required, MaxLength(1000)]
+    public int? LayoutPlanId { get; set; }
+
+    [MaxLength(1000)]
     public string Message { get; set; } = "";
-
-    public InquiryStatus Status { get; set; }
 }
 
 public class DashboardDto

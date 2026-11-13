@@ -47,6 +47,4 @@ public class PropertyListing
     public int AgentId { get; set; }
 
     public Agent? Agent { get; set; }
-
-    public List<Inquiry> Inquiries { get; set; } = new();
 }

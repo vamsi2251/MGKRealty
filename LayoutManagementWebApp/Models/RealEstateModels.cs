@@ -133,15 +133,19 @@ public class PropertyModel
 public class InquiryModel
 {
     public int Id { get; set; }
-    public int PropertyId { get; set; }
-    public string PropertyTitle { get; set; } = "";
-    public int ClientId { get; set; }
+
+    [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.MaxLength(120)]
     public string ClientName { get; set; } = "";
 
-    [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.MaxLength(1000)]
+    [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.MaxLength(30)]
+    public string Phone { get; set; } = "";
+
+    public int? LayoutPlanId { get; set; }
+    public string LayoutName { get; set; } = "";
+
+    [System.ComponentModel.DataAnnotations.MaxLength(1000)]
     public string Message { get; set; } = "";
 
-    public InquiryStatus Status { get; set; }
     public DateTime CreatedOn { get; set; }
 }
 

@@ -17,12 +17,12 @@ public class InquiriesController : ControllerBase
     public InquiriesController(RealEstateDbContext db) => _db = db;
 
     [HttpGet]
-    public async Task<ActionResult<List<InquiryDto>>> GetAll([FromQuery] InquiryStatus? status)
+    public async Task<ActionResult<List<InquiryDto>>> GetAll([FromQuery] int? layoutId)
     {
-        var query = _db.Inquiries.Include(i => i.Property).Include(i => i.Client).AsQueryable();
-        if (status is not null)
+        var query = _db.Inquiries.Include(i => i.LayoutPlan).AsQueryable();
+        if (layoutId is not null)
         {
-            query = query.Where(i => i.Status == status);
+            query = query.Where(i => i.LayoutPlanId == layoutId);
         }
 
         var inquiries = await query.OrderByDescending(i => i.CreatedOn).ToListAsync();
@@ -32,7 +32,7 @@ public class InquiriesController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<InquiryDto>> Get(int id)
     {
-        var inquiry = await _db.Inquiries.Include(i => i.Property).Include(i => i.Client)
+        var inquiry = await _db.Inquiries.Include(i => i.LayoutPlan)
             .FirstOrDefaultAsync(i => i.Id == id);
         return inquiry is null ? NotFound() : inquiry.ToDto();
     }
@@ -56,7 +56,7 @@ public class InquiriesController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<InquiryDto>> Update(int id, InquiryRequest request)
     {
-        var inquiry = await _db.Inquiries.Include(i => i.Property).Include(i => i.Client)
+        var inquiry = await _db.Inquiries.Include(i => i.LayoutPlan)
             .FirstOrDefaultAsync(i => i.Id == id);
         if (inquiry is null)
         {
@@ -90,15 +90,10 @@ public class InquiriesController : ControllerBase
 
     private async Task<bool> IsValidAsync(InquiryRequest request)
     {
-        if (!await _db.Properties.AnyAsync(p => p.Id == request.PropertyId))
+        if (request.LayoutPlanId is not null
+            && !await _db.LayoutPlans.AnyAsync(l => l.Id == request.LayoutPlanId))
         {
-            ModelState.AddModelError(nameof(request.PropertyId), "Select a valid listing.");
-        }
-
-        var name = (User.Identity?.Name ?? "").ToLower();
-        if (!await _db.Clients.AnyAsync(client => client.Id == request.ClientId && client.CreatedBy.ToLower() == name))
-        {
-            ModelState.AddModelError(nameof(request.ClientId), "Select a valid client.");
+            ModelState.AddModelError(nameof(request.LayoutPlanId), "Select a valid sketch.");
         }
 
         return ModelState.IsValid;
@@ -106,7 +101,6 @@ public class InquiriesController : ControllerBase
 
     private async Task LoadAsync(Inquiry inquiry)
     {
-        await _db.Entry(inquiry).Reference(i => i.Property).LoadAsync();
-        await _db.Entry(inquiry).Reference(i => i.Client).LoadAsync();
+        await _db.Entry(inquiry).Reference(i => i.LayoutPlan).LoadAsync();
     }
 }

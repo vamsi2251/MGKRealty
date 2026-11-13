@@ -47,12 +47,11 @@ public static class RealEstateMapper
     public static InquiryDto ToDto(this Inquiry inquiry) => new()
     {
         Id = inquiry.Id,
-        PropertyId = inquiry.PropertyId,
-        PropertyTitle = inquiry.Property?.Title ?? "",
-        ClientId = inquiry.ClientId,
-        ClientName = inquiry.Client?.Name ?? "",
+        ClientName = inquiry.ClientName,
+        Phone = inquiry.Phone,
+        LayoutPlanId = inquiry.LayoutPlanId,
+        LayoutName = inquiry.LayoutPlan?.Name ?? "",
         Message = inquiry.Message,
-        Status = inquiry.Status,
         CreatedOn = inquiry.CreatedOn
     };
 
@@ -92,9 +91,9 @@ public static class RealEstateMapper
 
     public static void Apply(this Inquiry inquiry, InquiryRequest request)
     {
-        inquiry.PropertyId = request.PropertyId;
-        inquiry.ClientId = request.ClientId;
-        inquiry.Message = request.Message.Trim();
-        inquiry.Status = request.Status;
+        inquiry.ClientName = request.ClientName.Trim();
+        inquiry.Phone = request.Phone.Trim();
+        inquiry.LayoutPlanId = request.LayoutPlanId;
+        inquiry.Message = (request.Message ?? "").Trim();
     }
 }
